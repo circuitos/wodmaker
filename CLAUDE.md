@@ -1,0 +1,81 @@
+# CLAUDE.md – WOD Generator
+
+## What this is
+Browser-based CrossFit-style workout generator, bilingual (Spanish/English). React + Vite, built to static files and served from GitHub Pages. Data-first: the `MOVES` table is the actual product, and the generator is a scoring loop on top of it.
+
+## Where Things Live
+One owner per fact: link, don't restate.
+
+| Information | Look here |
+|---|---|
+| Pitch, quick start, project layout | `README.md` |
+| GitHub + Pages setup, troubleshooting | `docs/SETUP.md` |
+| The movement database (`MOVES`) | `src/App.jsx` section 1 |
+| Workout formats, strength blocks, cues, UI copy (`T`) | `src/App.jsx` section 2 |
+| Candidate building, fault scoring, quantisation | `src/App.jsx` section 3 |
+| Rep lines, plain-text export, barbell plate maths | `src/App.jsx` section 4 |
+| Styles (`CSS`), form wiring, calendar export | `src/App.jsx` section 5 |
+| Pages site composition (root + branch previews) | `scripts/build-preview-site.mjs` |
+
+`src/App.jsx` is one file split into five numbered sections. Read the section header before editing; the numbering is the map.
+
+### Hierarchy of truth
+1. **Data wins.** `MOVES` is the actual content. Which movement can appear where, at what dose, and at what metabolic cost is decided there, not in prose.
+2. **The generator only reads.** `generate()` picks and scores; it never encodes knowledge about a specific movement. Anything movement-specific belongs in the `MOVES` entry.
+3. **`gh-pages` is generated output.** Never edit it, commit to it, or branch from it.
+
+## Commands
+```bash
+npm install                     # once
+npm run dev                     # local dev server on :5173
+npm run build                   # production build into dist/
+npm run preview                 # serve the built dist/ locally
+npm run lint                    # oxlint
+
+node scripts/build-preview-site.mjs /tmp/site   # read-only: compose the full Pages
+                                                # site (CI runs this on every push)
+```
+
+`npm run build:site` is the same composition step under a shorter name. It needs the remote branches present, so run `git fetch origin` first for a local dry run.
+
+## Deployment
+- GitHub Pages serves the generated `gh-pages` branch, which `.github/workflows/deploy-pages.yml` rebuilds on every push: the trunk (the repo's default branch) at the site root, every other branch at `/previews/<branch>/`, plus a preview index at `/previews/`. Branches with an open PR get a sticky preview-link comment from the workflow.
+- **Every branch is built separately.** Vite bakes the serving path into asset URLs, so each tree is built with its own `--base`: `/wodmaker/` for the trunk, `/wodmaker/previews/<branch>/` for the rest. A tree built at the wrong base loads a blank page with 404s on its JS and CSS.
+- Installs are shared between branches whose `package-lock.json` is byte-identical, so a normal push runs `npm ci` once. A branch that touches dependencies pays for its own install.
+- A branch that fails to build is skipped with a warning and drops off the preview index; the rest of the deploy still goes out. A trunk that fails to build fails the whole run and the live site silently goes stale, so check the Actions tab.
+- Vite hashes asset filenames, so a deploy busts its own caches for JS and CSS. `index.html` itself still rides out the Pages edge cache, up to about 10 minutes.
+
+## Gotchas
+- **`load` shares are what the fault checker reads.** Every `MOVES` entry carries a `load` map over the six axes that should sum to about 1. If it sums to something else, that movement quietly gets more or less weight than intended in `faults()`, and no error is raised. Check the axis bars in the UI after adding a movement.
+- **`cost` is calibrated, not arbitrary.** One hard minute of work is about 20 units. A new movement priced by feel rather than against that scale will distort every volume band it lands in.
+- **`env` gates availability.** A movement missing `casa` is unreachable at home, and a home session that ends up with almost no pulling raises the soft `nopull` warning instead of failing. Adding home-friendly pulling means adding a movement, not tuning the scorer.
+- **`generate()` degrades rather than fails.** It tries 300 candidates and returns the least-faulty one if none is clean, so a bad data edit shows up as workouts that always carry warnings, not as an exception.
+- **UI copy lives in `T`, keyed by language.** Both `es` and `en` have to be updated together; a missing key renders as `undefined` in the interface.
+
+## Doc Upkeep
+Update without asking when they drift:
+- `README.md`: project layout, quick start, how it works
+- `docs/SETUP.md`: Pages setup steps, preview behaviour
+- Treat doc drift as a bug, not a backlog item.
+
+## House Rules
+
+### No em dashes in copy
+
+Do not use em dashes (`—`) in user-facing or written copy. They read as an AI tell.
+Use a colon, period, comma, or semicolon, or restructure the sentence.
+
+This applies to: rendered app copy (the `T` and `CUES` blocks in `src/App.jsx`,
+text in `index.html`), README and docs, code comments, commit messages, and PR
+descriptions.
+
+En dashes in numeric ranges (e.g. `8–12 reps`) and the minus sign on negative
+numbers are fine; they are not the target.
+
+### No AI attribution on commits or PRs
+
+Don't append session URLs, "Generated by" lines, or `Co-authored-by` trailers to
+commits or PR bodies. `.claude/settings.json` disables the automatic ones.
+GitHub's integration can still auto-append a footer to a PR body *on creation*;
+if that happens, immediately re-set the description to strip it (an update
+doesn't re-add it).
