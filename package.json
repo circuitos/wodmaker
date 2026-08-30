@@ -1,13 +1,15 @@
 {
-  "name": "wod-app",
+  "name": "wodmaker",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "description": "Browser-based CrossFit-style workout generator. Builds a balanced conditioning piece around the strength block you already did and the equipment you have.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "preview": "vite preview",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "build:site": "node scripts/build-preview-site.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",
