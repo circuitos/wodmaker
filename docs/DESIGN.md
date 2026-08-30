@@ -6,29 +6,38 @@ Architecture and tuning decisions, and the reasoning behind them. Read this befo
 
 # The load model
 
-## Where the numbers come from
+## How the app counts effort
 
-`cost` on a `MOVES` entry is metabolic work per unit of measure, calibrated so one hard minute of work is about 20 units. Every volume number in the app is denominated in those units, which means any of them can be read back as minutes of work by dividing by 20.
+Every movement in `MOVES` has a `cost`: the effort in one rep, one calorie, or one metre of it. The scale is set so that **20 points is about one hard minute of work**. A burpee costs 3, so ten burpees is 30 points, or about a minute and a half.
 
-Three functions currently touch session volume:
+Two words that come up constantly below:
 
-| What | Where | Owns |
+- A **round** is one time through the list of movements.
+- A **session** is every round added up, plus the strength block you did first.
+
+The app works out both numbers. It works them out in two different places that do not know about each other, and that is the whole problem.
+
+## Where the two numbers live
+
+| Code | Section | What it decides |
 |---|---|---|
-| `volumeBand(fmt, cap, rounds)` | section 3 | target work for one pass through the movement list |
-| `buildCandidate` | section 3 | scales every rep count so the pass hits that target |
-| `dayWork` | section 5 | multiplies the pass by a per-format guess at how many passes there are, then adds the strength block |
+| `volumeBand()` | 3 | how many points one round should be |
+| `buildCandidate()` | 3 | scales the rep counts until the round hits that |
+| `dayWork` | 5 | guesses how many rounds there are, multiplies, adds the strength block |
 
-## What is wrong with it
+## Problem 1: the same fact is written down twice
 
-**1. One fact is split across two sections and held together by hand.**
+Take a 10-minute AMRAP.
 
-For AMRAP, `volumeBand` returns `[cap * 3.0, cap * 5.2]`, midpoint `cap * 4.1`. `dayWork` multiplies by 5. The product is `cap * 20.5`, which is the real intent: a `cap`-minute AMRAP is about `cap` hard minutes of work. That intent is written down nowhere. It exists only as the product of a constant in section 3 and a different constant in section 5, in different files' worth of code, with nothing checking they still agree. Change either one and the calibration silently drifts.
+- `volumeBand` says one round should be about 41 points.
+- `dayWork` assumes you get through 5 rounds.
+- 41 × 5 = 205 points, which is about 10 hard minutes.
 
-**2. Format choice moves session load more than anything the user controls.**
+The answer is right. A 10-minute AMRAP should be about 10 minutes of work. But that "should" is written down nowhere. It exists only as 41 in section 3 multiplied by 5 in section 5, and nothing checks that the two still line up. Change the 41 and nobody changes the 5, and the app quietly starts lying about how hard the session was.
 
-Working the current constants through every format and parameter combination:
+## Problem 2: the format decides how hard your session is, and you do not pick the format
 
-| Format | Draw weight | Session load | Hard minutes |
+| Format | How often it comes up | Session points | Hard minutes |
 |---|---|---|---|
 | AMRAP | 22% | 164 to 246 | 8.2 to 12.3 |
 | For time | 28% | 190 | 9.5 |
@@ -38,86 +47,92 @@ Working the current constants through every format and parameter combination:
 | Chipper | 7% | 155 | 7.8 |
 | Quality | 5% | 100 | 5.0 |
 
-That is a 3.6x spread, and the user has no say in it. Format is drawn at random by weight, and the volume follows from the format. Press the button twice and get a 3.4 minute session then a 12.3 minute one, with the same inputs.
+The format is picked at random. Some come up more often than others, but you have no say in which one you get. The same inputs give you a 3.4 minute session on one press and a 12.3 minute one on the next. That is a 3.6x gap.
 
-Some spread is honest: an interval piece with rest really is less total work than a twelve minute AMRAP. But 3.6x is not a rounding difference, and today it is the single largest determinant of how hard the session is.
+Some of it is honest. An interval piece with rest really is less work than a twelve minute AMRAP. But 3.6x is a wide gap, and right now it is the biggest single thing deciding how hard your workout turns out.
 
-This is the finding that decides where a load control belongs. A slider that scales load by plus or minus 25% sits underneath a 3.6x random draw, so it would feel broken: the user would move it and see less change than pressing "another workout". The control has to act on the thing that dominates, which means load stops being an output of the format draw and becomes an input to it.
+**This is what decides where a load control can go.** Add a slider that moves load by 25% either way and it sits underneath a 3.6x random draw. You would move it and see less change than you get from pressing "another workout". It would feel broken.
 
-**3. The strength block is accounted for twice, in two different ways.**
+So the control cannot be a multiplier bolted on top. Load has to become something you set, which the format then works around.
 
-`buildCandidate` shrinks the conditioning target by `st.dampen`. `dayWork` separately adds `pre * 0.9` for display. Both are legitimate effects (a hard squat session both reduces what you should do afterwards and counts as work you did), but one lives in the generator and one in the view, and neither mentions the other.
+## Problem 3: the strength block is counted twice, two different ways
 
-Worth recording, since it looks derivable and is not: `dampen` cannot be computed from the `pre` sums. Drop per unit of pre-load is about 0.00107 for squat, 0.00097 deadlift, 0.00108 lower and full, but 0.00043 for press and 0.00057 for pull. Leg work suppresses later conditioning roughly twice as hard as upper body work does. That is real information encoded in seven hand-tuned numbers, so `dampen` stays authored data.
+In the generator, `dampen` shrinks the workout because you are already tired. In the display, `pre * 0.9` adds the strength work into your total for the day.
 
-## Smaller things found in the same code
+Both are fair. A hard squat session should mean less conditioning afterwards, and it should also count as work you did. But one lives in section 3 and one in section 5, and neither knows the other exists.
 
-- `volumeBand` returns a range whose only use is `(lo + hi) / 2`. The range is never read as a range. It should be one number.
-- The EMOM branch of `dayWork` is `cap / items.length * (items.length === 3 ? 3 : items.length)`, which equals `cap` for every possible value of `items.length`. It is the fossil of tuning a number until the output looked right.
-- `dayWork` is a single expression with five nested ternaries, and it is the only place in section 5 that knows anything about how formats work.
+Worth writing down, because it looks like it should be simple and is not: **`dampen` cannot be calculated from how much the strength block loaded you.** Squat and pull both load 140 points. Squat cuts the following workout by 15%, pull cuts it by 8%. Nearly double the cut for the same load, because legs take more out of you than arms do. That difference is real and it lives only in those seven hand-tuned numbers, so `dampen` stays as authored data.
 
-## The model to move to
+## Three small things in the same code
 
-One fact per format, declared where format knowledge already lives (section 2):
+- `volumeBand` returns a range, `[lo, hi]`, and the only thing done with it is take the middle. It should be one number.
+- The EMOM line inside `dayWork` is `cap / items.length * (items.length === 3 ? 3 : items.length)`. Whatever `items.length` is, that works out to `cap`. It is the leftover of somebody adjusting a number until the output looked right.
+- `dayWork` is one expression with five nested ternaries, and it is the only thing in section 5 that knows anything about how formats work.
+
+## The fix
+
+Give each format two facts, written where the other format facts already are:
 
 ```js
 { id: "amrap", w: 22, caps: [8, 10, 12], slots: [3, 4, 5], scale: 1.0,
-  passes: (p) => 5,             // times through the movement list
-  load:   (p) => p.cap * 20.5 } // target work for the whole piece
+  passes: (p) => 5,             // rounds you will get through
+  load:   (p) => p.cap * 20.5 } // points for the whole piece
 ```
 
-Everything else derives from those two, through exactly two functions that are inverses of each other:
+Two functions use them, one dividing and one multiplying:
 
 ```js
-// section 3: what one pass should cost, given a target
-roundTarget(fmt, p, intensity, strength) = fmt.load(p) * intensity * strength.dampen / fmt.passes(p)
+// before: what should one round cost?
+roundTarget = fmt.load(p) * intensity * strength.dampen / fmt.passes(p)
 
-// section 3: what the finished session actually costs
+// after: what did the finished session cost?
 sessionLoad(c) = { conditioning: c.totalWork * c.fmt.passes(c),
                    strength:     sumPre(c.strength) * 0.9,
                    total:        conditioning + strength }
 ```
 
-The generator calls the first. The view calls the second and renders `total`. Change a format's `load` and both move together, because there is only one constant. Section 5 stops knowing what a format is.
+Same two numbers, used twice. Change `load` and the target and the display move together, because there is only one number to change. Section 5 stops knowing what a format is.
 
-`intensity` is the hook the load control plugs into later. It defaults to 1 and changes nothing until there is a control bound to it.
+`intensity` is a multiplier that sits at 1 and does nothing. It is there so the control has somewhere to plug in later.
 
-## Making load an input instead of an output
+## Who decides how hard the session is
 
-This is the part that needs a decision, because it changes behaviour rather than structure.
+This one changes behaviour rather than structure, so it is your call.
 
-Today: draw a format, draw its parameters, and the load falls out (68 to 246).
+**Now:** the app picks a format, picks its settings, and the difficulty is whatever falls out, somewhere between 68 and 246 points.
 
-Proposed: the user sets a target, then draw a format by weight as now, then choose that format's `cap` or `rounds` from its authored list to land closest to the target, then let rep scaling absorb what remains. If the closest fit is still far off (asking an interval piece for 246), redraw the format, up to a few attempts, then accept the miss. That mirrors how `generate()` already handles composition: try repeatedly, degrade rather than fail.
+**Proposed:** you say how hard you want it. The app picks a format the way it does now, then picks that format's `cap` or number of rounds to land as close to your number as it can, then stretches or shrinks the reps to cover the rest. If it still cannot get close, because you asked an interval piece for 246 points, it throws that format away and draws another. After a few tries it takes the closest it found. `generate()` already works this way for movement balance.
 
-What this preserves: the authored `caps` and `rounds` lists stay as they are, because they came from real sessions. Format variety stays, since formats are still drawn by weight.
+The authored `caps` and `rounds` lists do not change, because they came from real sessions.
 
-What it costs: the format draw is no longer purely by weight once a target is set. Ask for a very light session and interval pieces will be over-represented; ask for a heavy one and they will nearly vanish. That is arguably correct, but it is a behaviour change and should be a deliberate one.
+The cost: format choice stops being purely random once you set a number. Ask for something light and you will see a lot of interval pieces. Ask for something heavy and you will almost never see one. That is probably correct, but it is a change and you should agree to it before we build it.
 
-## Sequencing
+## Order of work
 
-The refactor is not one commit, and two of the four steps exist only to make the third checkable.
+Four commits. Two of them exist only so we can tell whether the third one broke anything.
 
-**Step 1. Split `src/App.jsx`.** The generator cannot be tested while it lives inside a React component file, because a Node script cannot import it. Move sections 1 to 4 out into `src/moves.js`, `src/formats.js`, `src/generator.js` and `src/text.js`, leaving section 5 as the component. Pure moves, no edits, so the diff reads as cut and paste.
+**1. Split `src/App.jsx`.** A Node script cannot import the generator while it lives inside a React component file. Move sections 1 to 4 into `moves.js`, `formats.js`, `generator.js` and `text.js`, and leave section 5 as the component. Move the code, do not edit it, so the diff reads as cut and paste.
 
-Cost: it is a large diff, and it kills the "one file, five numbered sections" map that `CLAUDE.md` and `README.md` both describe. Both have to be rewritten in the same commit. This also converges the project on the layout the other repos in this account already use.
+This is a big diff, and it kills the "one file, five numbered sections" map that `CLAUDE.md` and `README.md` both describe. Both get rewritten in the same commit.
 
-**Step 2. Add `scripts/smoke.js`.** Sweep environment by strength block by format across many seeds, and write mean and spread of session load per format, axis share distributions, and warning rates to `out/smoke-report.md`. Add `npm run smoke`. Run it and commit the baseline before touching the model.
+**2. Add `scripts/smoke.js`.** Generate a few thousand workouts covering every combination of settings and write down what came out: average and spread of session points per format, how the axis shares fall, how often each warning fires. Add `npm run smoke`, run it, commit the numbers.
 
-There are no tests in this project. Without a baseline, step 3 is unfalsifiable: generated workouts are random, so "it still looks right" is not evidence. This is also the convention the sibling repo already uses for exactly this problem.
+This has to come before step 3. There are no tests here and the output is random, so if we change the model and the workouts still look plausible, that tells us nothing. We need the numbers from before.
 
-**Step 3. Unify the model.** Add `passes` and `load` to `FORMATS`. Replace `volumeBand` with `roundTarget`. Add `sessionLoad`. Reduce `dayWork` to a call. Delete the ternary chain and the EMOM no-op. Pick each format's `load` constant to reproduce today's implied session totals exactly, so the smoke report before and after is unchanged. A clean diff here is a report that does not move.
+**3. Unify the model.** Add `passes` and `load` to `FORMATS`, replace `volumeBand` with `roundTarget`, add `sessionLoad`, cut `dayWork` down to a call. Delete the ternary chain and the EMOM line that does nothing. Choose each format's `load` so the numbers come out exactly where they are today.
 
-**Step 4. Add the control.** Only now, on a structure that has somewhere to put it.
+It is done when the smoke numbers have not moved.
 
-## The control itself, when we get there
+**4. Add the control.** Now there is somewhere to put it.
 
-Where on screen: with the inputs, not the output. It changes what gets generated, so it belongs next to "where are you training" and "what did you do first", not next to the result. The form currently has two rows and a third fits.
+## The control itself
 
-What kind of control: chips, not a slider. The app has no slider anywhere, and chips with `aria-pressed` are its existing idiom for picking one of a few. A continuous slider would also promise precision the model does not have, since `cost` values are estimates. Three or four steps, labelled in hard minutes because that is what the unit actually means, is more honest than an abstract 1 to 10.
+Put it with the inputs, not the results. It changes what gets made, so it belongs next to "where are you training" and "what did you do first". The form has two rows and a third one fits.
+
+Make it chips, not a slider. There is no slider anywhere in this app, and chips are already how it asks you to pick one of a few things. A slider would also suggest a precision the model does not have, since every `cost` is an estimate. Three or four steps, labelled in hard minutes, since that is what the unit actually is.
 
 ## Open questions
 
-1. Should the target read as hard minutes of work (about 5, 8, 12), or as named efforts (suave, normal, duro)? Minutes are honest about the unit but invite the reading that the session takes that long in elapsed time, which it does not.
-2. Once the user sets load, does the plate meter still earn its place? It currently visualises a number the user did not choose. It could show target against actual instead, or go.
-3. Is the 3.6x random spread a bug or variety worth keeping? Everything above assumes it is a bug. If it is deliberate, the control becomes a range constraint rather than a target and the design changes.
+1. Should the steps say hard minutes (5, 8, 12) or names (suave, normal, duro)? Minutes are honest about what the number means, but people will read "12" as how long the workout takes, and it is not.
+2. Once you are choosing the load, is the plate meter still worth its space? Right now it draws a number you did not pick. It could show what you asked for against what you got, or go.
+3. Is the 3.6x random spread actually a bug? Everything above assumes yes. If you like it, the control becomes "keep it between X and Y" rather than "make it X", and the design changes.
