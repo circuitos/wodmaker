@@ -24,6 +24,21 @@ One owner per fact: link, don't restate.
 2. **The generator only reads.** `generate()` picks and scores; it never encodes knowledge about a specific movement. Anything movement-specific belongs in the `MOVES` entry.
 3. **`gh-pages` is generated output.** Never edit it, commit to it, or branch from it.
 
+## Adding Features
+
+A new feature lands as part of the app, not beside it. Before writing code, work out where the idea belongs and what it makes obsolete. Kent Beck's version: make the change easy, then make the easy change. When a feature is awkward to add, the awkwardness is telling you something about the current structure, and routing around it is how an app turns into a pile of settings.
+
+Run this check before implementing:
+
+1. **Does the app already half-model this?** Extend what is there instead of standing up a parallel version. Two representations of one idea is the failure mode, and there is already an example: `volumeBand()` sets a per-round volume target in section 3, `dayWork` re-derives a session total in section 5, and neither knows the other exists.
+2. **What does it make redundant?** A new capability often replaces an older decision that only made sense in its absence. Retire the old thing in the same change. Keeping both is how the interface silts up.
+3. **Where does it live on screen?** Every control competes for one screen and one reader's attention. If a new control has no natural home, the layout wants rethinking rather than another row of buttons.
+4. **Does it need groundwork that doesn't exist yet?** Splitting `App.jsx`, extracting a module, reworking the form flow, or changing the shape of a `MOVES` entry are all legitimate prerequisites. Land them as their own commit first, then add the feature onto a structure that fits it.
+
+Say the restructuring out loud before starting: what moves, what breaks, what it costs, and what stops being supported. A plan is cheap to argue with; a merged refactor is not.
+
+The exception is narrow. One more movement in `MOVES`, one more cue, one more string in `T`: that is just an addition and needs none of this. The check is for anything that adds a control, a mode, a screen, or a new idea to the model.
+
 ## Commands
 ```bash
 npm install                     # once

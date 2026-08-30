@@ -82,7 +82,7 @@ The movement table is the actual content. To add a movement, add an entry to `MO
 
 Two things to get right: `load` shares should sum to about 1, and `cost` is calibrated so a hard minute of work is roughly 20 units. Both are read silently by the fault checker, so a wrong value shows up as skewed workouts rather than an error. Run `npm run lint` and check the axis bars in the interface after any data edit.
 
-See `CLAUDE.md` for the field reference, the known gotchas, and the house rules on copy and commits.
+See `CLAUDE.md` for the field reference and the known gotchas. Anything larger than a data edit, meaning a new control, mode, or screen, starts with the check in its Adding Features section: work out where the idea belongs and what it replaces before writing code.
 
 ## License
 
