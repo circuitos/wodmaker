@@ -51,9 +51,9 @@ The format is picked at random. Some come up more often than others, but you hav
 
 Some of it is honest. An interval piece with rest really is less work than a twelve minute AMRAP. But 3.6x is a wide gap, and right now it is the biggest single thing deciding how hard your workout turns out.
 
-**This is what decides where a load control can go.** Add a slider that moves load by 25% either way and it sits underneath a 3.6x random draw. You would move it and see less change than you get from pressing "another workout". It would feel broken.
+**Reviewed and accepted (see Decisions).** The spread stays. Formats genuinely differ in how much work they are, and the variety is wanted.
 
-So the control cannot be a multiplier bolted on top. Load has to become something you set, which the format then works around.
+That settles what kind of control this can be. A control that promised an absolute target ("give me a 200 point session") would have to override the format choice to deliver it. A control that is relative to whatever format came up ("make this one harder") does not. The spread makes the first kind expensive and the second kind honest, so the control is relative.
 
 ## Problem 3: the strength block is counted twice, two different ways
 
@@ -95,17 +95,15 @@ Same two numbers, used twice. Change `load` and the target and the display move 
 
 `intensity` is a multiplier that sits at 1 and does nothing. It is there so the control has somewhere to plug in later.
 
-## Who decides how hard the session is
+## How hard, and who says so
 
-This one changes behaviour rather than structure, so it is your call.
+Settled: the control scales the workout the app already drew. It does not set a target the format has to hit.
 
-**Now:** the app picks a format, picks its settings, and the difficulty is whatever falls out, somewhere between 68 and 246 points.
+`intensity` multiplies `roundTarget`, which is where the proposed model already put it. Nothing else moves. Format choice stays exactly as random as it is now, there is no redraw loop, and the authored `caps` and `rounds` lists are untouched.
 
-**Proposed:** you say how hard you want it. The app picks a format the way it does now, then picks that format's `cap` or number of rounds to land as close to your number as it can, then stretches or shrinks the reps to cover the rest. If it still cannot get close, because you asked an interval piece for 246 points, it throws that format away and draws another. After a few tries it takes the closest it found. `generate()` already works this way for movement balance.
+What this costs, stated plainly: "hard" is not a fixed amount of work. A hard interval piece is still lighter than a soft AMRAP. That follows from keeping the spread, and it is the reason the steps are named rather than numbered in minutes.
 
-The authored `caps` and `rounds` lists do not change, because they came from real sessions.
-
-The cost: format choice stops being purely random once you set a number. Ask for something light and you will see a lot of interval pieces. Ask for something heavy and you will almost never see one. That is probably correct, but it is a change and you should agree to it before we build it.
+**One place this will bite later.** A weekly plan that spreads muscle groups across two to four days needs to compare days against each other, and a relative multiplier gives no common scale to compare them on. If the week planner gets built, the absolute-target idea comes back with it. Not a reason to build it now, but the reason to expect it again.
 
 ## Order of work
 
@@ -123,16 +121,26 @@ This has to come before step 3. There are no tests here and the output is random
 
 It is done when the smoke numbers have not moved.
 
-**4. Add the control.** Now there is somewhere to put it.
+**4. Add the control.** Three chips wired to one multiplier. Small, now that there is somewhere to put it.
 
 ## The control itself
 
 Put it with the inputs, not the results. It changes what gets made, so it belongs next to "where are you training" and "what did you do first". The form has two rows and a third one fits.
 
-Make it chips, not a slider. There is no slider anywhere in this app, and chips are already how it asks you to pick one of a few things. A slider would also suggest a precision the model does not have, since every `cost` is an estimate. Three or four steps, labelled in hard minutes, since that is what the unit actually is.
+Make it chips, not a slider. There is no slider anywhere in this app, and chips are already how it asks you to pick one of a few things. A slider would also suggest a precision the model does not have, since every `cost` is an estimate.
 
-## Open questions
+Three steps, named: **soft / normal / hard** (`suave / normal / duro`). Names rather than minutes, because the control is relative to the workout you got. Printing "8 min" would claim an absolute amount of work that this control does not deliver, and would also be read as how long the session takes, which is a different number again. Both readings are wrong; a name makes neither promise.
 
-1. Should the steps say hard minutes (5, 8, 12) or names (suave, normal, duro)? Minutes are honest about what the number means, but people will read "12" as how long the workout takes, and it is not.
-2. Once you are choosing the load, is the plate meter still worth its space? Right now it draws a number you did not pick. It could show what you asked for against what you got, or go.
-3. Is the 3.6x random spread actually a bug? Everything above assumes yes. If you like it, the control becomes "keep it between X and Y" rather than "make it X", and the design changes.
+## Decisions
+
+**Named steps, not minutes.** Soft, normal, hard. See "The control itself" for why.
+
+**The plate meter stays, and gets a show/hide.** It draws a number you did not choose, which was the argument for cutting it, but it is worth keeping and hiding. The app already has this pattern: `calOpen` opens and closes the calendar block. The toggle belongs on the `.mhead` row, which already holds the label and the number.
+
+This introduces the first saved preference in the app. Nothing is persisted today: reload and you are back to Spanish, gym, no strength block. Worth knowing before building it, because once there is somewhere to keep a preference, **language is the more valuable thing to keep**. Resetting the plate meter on reload is mildly annoying; resetting an English speaker to Spanish every visit is worse. Build the store once and put both in it.
+
+A note on wording: `sessionStorage` is forgotten when the tab closes, `localStorage` is not. For "I do not want to see this meter", `localStorage` is almost certainly the intent. Both are one line.
+
+This is independent of the load refactor and can land before it, after it, or on its own.
+
+**The 3.6x spread is not a bug.** Formats differ in how much work they are, and that variety is wanted. Recorded in Problem 2, which now explains what the spread costs rather than arguing it should go. The knock-on is that the load control is relative rather than absolute, which is what makes step 4 small.
