@@ -9,6 +9,7 @@ One owner per fact: link, don't restate.
 | Information | Look here |
 |---|---|
 | Pitch, quick start, project layout | `README.md` |
+| Architecture and tuning decisions, the load model | `docs/DESIGN.md` |
 | GitHub + Pages setup, troubleshooting | `docs/SETUP.md` |
 | The movement database (`MOVES`) | `src/App.jsx` section 1 |
 | Workout formats, strength blocks, cues, UI copy (`T`) | `src/App.jsx` section 2 |
@@ -70,6 +71,7 @@ node scripts/build-preview-site.mjs /tmp/site   # read-only: compose the full Pa
 ## Doc Upkeep
 Update without asking when they drift:
 - `README.md`: project layout, quick start, how it works
+- `docs/DESIGN.md`: architecture and tuning decisions; add to it when a design question gets settled
 - `docs/SETUP.md`: Pages setup steps, preview behaviour
 - Treat doc drift as a bug, not a backlog item.
 

@@ -56,6 +56,7 @@ wodmaker/
 │   └── workflows/
 │       └── deploy-pages.yml    # Pages deploy: trunk + branch previews
 ├── docs/
+│   ├── DESIGN.md               # architecture and tuning decisions
 │   └── SETUP.md                # GitHub + Pages walkthrough
 ├── .claude/
 │   ├── launch.json             # dev server config for Claude Code
