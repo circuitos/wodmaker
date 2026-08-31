@@ -42,6 +42,11 @@ export function axisVector(items) {
   return v;
 }
 
+/* The seven presets, resolved to the same shape anything else arrives in. */
+export function arrivingFromPreset(id) {
+  return STRENGTH.find((s) => s.id === id) || STRENGTH[0];
+}
+
 /* What one round should cost. The inverse of sessionLoad below: that one
    multiplies a finished round back up to a session, this one divides a target
    session down to a round. `intensity` is the hook the soft/normal/hard control
@@ -77,9 +82,9 @@ export function itemCost(it) {
   return it.reps * it.move.cost * (it.move.side ? 2 : 1);
 }
 
-export function buildCandidate(env, strengthId, locked, fixed) {
+export function buildCandidate(env, arriving, locked, fixed) {
   const fmt = fixed ? fixed.fmt : weightedFormat();
-  const st = STRENGTH.find((s) => s.id === strengthId);
+  const st = arriving;
   const nSlots = fixed ? null : pick(fmt.slots);
   const cap = fixed ? fixed.cap : fmt.caps ? pick(fmt.caps) : null;
   const rounds = fixed ? fixed.rounds : fmt.rounds ? pick(fmt.rounds) : fmt.id === "ladder" ? 5 : 1;
@@ -144,10 +149,16 @@ export function faults(c, env) {
   return out;
 }
 
-export function generate(env, strengthId, locked = [], fixed = null) {
+/* `arriving` is the axis load you turn up already carrying, and how much it
+   should damp what follows. Today it comes from the strength block you did
+   first; a week planner will hand it yesterday's session, decayed. Either
+   source, same shape: { pre: { axis: points }, dampen }. A preset id is still
+   accepted for convenience. */
+export function generate(env, arriving, locked = [], fixed = null) {
+  if (typeof arriving === "string") arriving = arrivingFromPreset(arriving);
   let best = null, bestScore = Infinity;
   for (let i = 0; i < 300; i++) {
-    const c = buildCandidate(env, strengthId, locked, fixed);
+    const c = buildCandidate(env, arriving, locked, fixed);
     if (!c) continue;
     const f = faults(c, env);
     const hard = f.filter((x) => x.hard).length;
