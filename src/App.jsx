@@ -10,8 +10,8 @@ import { asText, headline, repParts, strengthLine } from "./text.js";
 import { platesFor } from "./plates.js";
 import { loadPref, savePref } from "./prefs.js";
 import {
-  changeEnv, daySeed, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, presetsFor,
-  redrawRows, weekCount, weekSummary, withPreset,
+  changeEnv, daySeed, defaultWeekConfig, editWeekDay, normaliseOneRM, normaliseWeek, planWeek,
+  presetsFor, redrawRows, weekCount, weekSummary, withPreset,
 } from "./planner.js";
 import WeekPlanner from "./WeekPlanner.jsx";
 
@@ -271,7 +271,7 @@ export default function App() {
   /* A one-rep max is a fact about you rather than about a day, so it stays
      here while everything else about a session lives on the day it belongs
      to. */
-  const [oneRM, setOneRM] = useState(() => loadPref("oneRM", {}));
+  const [oneRM, setOneRM] = useState(() => normaliseOneRM(loadPref("oneRM", {})));
 
   /* The week is the model and the Day tab is an editor for one of its days,
      so there is one set of configs and both views read and write it. A day is
@@ -312,7 +312,7 @@ export default function App() {
   const wod = useMemo(() => (base ? { ...base, cue: cueFor(base, lang) } : null), [base, lang]);
 
   const patchDay = (patch, at = index) => {
-    setConfigs((current) => editWeekDay(current, at, patch));
+    setConfigs((current) => editWeekDay(current, at, { ...patch, auto: false }));
     if (patch.weekday !== undefined && at === index) setSelectedDay(Number(patch.weekday));
     setCopied(false);
   };
@@ -330,12 +330,20 @@ export default function App() {
      added and cutting one you configured. */
   const changeCount = (next) => {
     const fresh = defaultWeekConfig(next, oneRM, weekSeed);
-    const merged = [...configs].sort((a, b) => a.weekday - b.weekday).slice(0, next);
+    let merged = [...configs].sort((a, b) => a.weekday - b.weekday);
+    /* Shrinking drops the days the app added to fill the week before it touches
+       one you set up. Keeping the earliest instead meant a Friday and Saturday
+       week grown to four days and back kept the two weekdays the app had
+       inserted and threw away both of yours. */
+    while (merged.length > next) {
+      const filler = merged.map((c, i) => (c.auto ? i : -1)).filter((i) => i >= 0);
+      merged.splice(filler.length ? filler[filler.length - 1] : merged.length - 1, 1);
+    }
     const free = fresh.map((c) => c.weekday).filter((d) => !merged.some((c) => c.weekday === d));
     while (merged.length < next && free.length) {
-      merged.push({ ...fresh[merged.length], weekday: free.pop() });
+      merged.push({ ...fresh[merged.length], weekday: free.pop(), auto: true });
     }
-    merged.sort((a, b) => a.weekday - b.weekday);
+    merged = merged.sort((a, b) => a.weekday - b.weekday);
     setCount(next);
     setConfigs(merged);
     if (!merged.some((c) => c.weekday === selectedDay)) setSelectedDay(merged[0].weekday);
@@ -400,8 +408,13 @@ export default function App() {
      config every render. Each one names the movement it replaces and carries
      its own draw, so swapping the same slot twice gives two different answers.
      See applySwaps() in planner.js. */
+  /* Swapping a movement drops any lock on it. The lock would otherwise name a
+     movement no longer on the card, so it could not be unticked and would
+     bring it back on the next redraw. */
   const swapOne = (moveId) => patchDay({
     swaps: [...(config.swaps || []), { moveId, nonce: (config.swaps || []).length }],
+    locks: (config.locks || []).filter((l) => l.moveId !== moveId),
+    held: (config.held || []).filter((l) => l.moveId !== moveId),
   });
 
   const text = useMemo(() => (wod ? asText(wod, lang, env) : ""), [wod, lang, env]);
@@ -442,9 +455,17 @@ export default function App() {
     doCopy();
   };
 
-  const icsHref = useMemo(() => {
-    if (!wod) return "";
+  /* A date input mid-edit is empty or incomplete, and `new Date("...T:00")` is
+     an Invalid Date whose `toISOString()` throws. Thrown from a render, that
+     unmounts the whole app while you are typing a time. */
+  const when = useMemo(() => {
     const start = new Date(`${useDate}T${time}:00`);
+    return Number.isFinite(start.getTime()) ? start : null;
+  }, [useDate, time]);
+
+  const icsHref = useMemo(() => {
+    if (!wod || !when) return "";
+    const start = when;
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     const z = (d) => d.toISOString().replace(/[-:]|\.\d{3}/g, "");
     const esc = (v) => v.replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
@@ -452,15 +473,15 @@ export default function App() {
       `UID:${Date.now()}@wodgen`, `DTSTAMP:${z(new Date())}`, `DTSTART:${z(start)}`, `DTEND:${z(end)}`,
       `SUMMARY:${esc(headline(wod, lang))}`, `DESCRIPTION:${esc(text)}`, "END:VEVENT", "END:VCALENDAR"].join("\r\n");
     return "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
-  }, [wod, useDate, time, text, lang]);
+  }, [wod, when, text, lang]);
 
   const gcalHref = useMemo(() => {
-    if (!wod) return "";
-    const start = new Date(`${useDate}T${time}:00`);
+    if (!wod || !when) return "";
+    const start = when;
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     const z = (d) => d.toISOString().replace(/[-:]|\.\d{3}/g, "");
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(headline(wod, lang))}&dates=${z(start)}/${z(end)}&details=${encodeURIComponent(text)}`;
-  }, [wod, useDate, time, text, lang]);
+  }, [wod, when, text, lang]);
 
   const warnList = useMemo(() => {
     if (!wod) return [];
@@ -652,7 +673,7 @@ export default function App() {
                       <input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <a className="btn" href={icsHref} download="wod.ics">{t.download}</a>
+                    <a className="btn" href={icsHref} download="wod.ics" aria-disabled={!when}>{t.download}</a>
                     <a className="btn" href={gcalHref} target="_blank" rel="noreferrer">{t.gcal}</a>
                   </div>
                 </div>

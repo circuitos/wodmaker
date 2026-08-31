@@ -2,7 +2,7 @@ import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, intensityK } from "./formats.js";
 import { generate, mulberry32, sessionAxisLoad, sessionLoad } from "./generator.js";
 import {
-  PRESET_ROWS, accessoryPoints, accessoriesFor, arrivingFromAxis, arrivingFromLifts,
+  LIFTS, PRESET_ROWS, accessoryPoints, accessoriesFor, arrivingFromAxis, arrivingFromLifts,
   defaultAccessoryRow, liftById, moveById, pctFor, rowAvailable, splitRows,
 } from "./lifts.js";
 import { CORPUS_DEFAULTS } from "./corpus.js";
@@ -38,7 +38,7 @@ export const targetFor = (env) => TARGET_DAY_LOAD[env] ?? TARGET_DAY_LOAD.gym;
    above. The budget covers the whole block, so a park day that keeps weighted
    pull-ups gets a small accessory block and one with no barbell at all gets a
    long one. */
-const PRE_BUDGET = { gym: null, parque: 150, casa: 115 };
+const PRE_BUDGET = { gym: null, parque: 200, casa: 130 };
 
 const SCHEDULES = {
   2: CORPUS_DEFAULTS.trainingDays,
@@ -63,9 +63,10 @@ export function weekCount(count) {
 /* A strength preset, turned into rows a day can own and edit. Kilos come from
    the one-rep maxes on file, exactly as the daily grid fills them in. */
 export function rowsForPreset(id, oneRM = {}) {
+  const rm = normaliseOneRM(oneRM);
   return (PRESET_ROWS[id] || []).map((row) => ({
     ...row,
-    kg: oneRM[row.liftId] > 0 && row.pct ? Math.round(oneRM[row.liftId] * row.pct) : 0,
+    kg: rm[row.liftId] > 0 && row.pct ? Math.round(rm[row.liftId] * row.pct) : 0,
   }));
 }
 
@@ -107,8 +108,10 @@ export function drawAccessory(seed = 0, env = "gym", budget = undefined) {
   /* The heaviest accessory block in the log is worth about 160 points. With a
      barbell in the session the size comes from the log but the cost does not,
      so a draw of three expensive movements could reach 289 and outweigh the
-     piece it precedes. Away from a barbell the budget governs instead. */
-  const ceiling = cap === null ? 160 : Infinity;
+     piece it precedes. Away from a barbell the budget is the ceiling: leaving
+     it as a loop condition let one chosen movement overshoot it without
+     limit. */
+  const ceiling = cap === null ? 160 : cap;
   let want = 5;
   if (cap === null) {
     const sizes = Object.entries(CORPUS_DEFAULTS.accessoryBlockSizes)
@@ -119,15 +122,18 @@ export function drawAccessory(seed = 0, env = "gym", budget = undefined) {
 
   const picked = [];
   let points = 0;
-  while (pool.length && picked.length < want && (cap === null || points < cap)) {
+  while (pool.length && picked.length < want && points < ceiling) {
     const choice = weighted(pool, (item) => item.sessions);
     pool.splice(pool.indexOf(choice), 1);
     const row = { moveId: choice.moveId, sets: choice.sets, reps: choice.reps, kg: choice.kg || 0 };
     const cost = accessoryPoints(row);
     /* A movement that would take the block past the ceiling is passed over
        rather than ending the draw, so one heavy choice cannot land beyond it.
-       The first is always taken: a block of nothing is not the answer. */
-    if (picked.length > 0 && points + cost > ceiling) continue;
+       No exception for the first: where the lifts have already spent the
+       budget, or nothing left in the pool fits what remains, an empty
+       accessory block is the honest answer. Taking the cheapest anyway is how
+       a park day with weighted pull-ups came out 21% over its budget. */
+    if (points + cost > ceiling) continue;
     picked.push(row);
     points += cost;
   }
@@ -231,6 +237,7 @@ export function defaultWeekConfig(count = 2, oneRM = {}, seed = 0) {
     env: "gym",
     intensity: "auto",
     byEnv: {},
+    auto: false,
     rows: rowsForDay(FOCUS[safeCount][index], oneRM, daySeed(seed, index), "gym"),
     locks: [],
     held: [],
@@ -246,6 +253,19 @@ const INTENSITY_IDS = new Set(["auto", ...INTENSITY.map((step) => step.id)]);
 /* Bounds, not just signs. `Infinity > 0` is true, so a saved `1e309` used to
    pass every check here and turn a day's total into Infinity and the next
    day's into NaN, with the fault count still reading zero. */
+/* One-rep maxes are persisted separately from the week and were the one saved
+   thing not going through a bounds check. A stored `1e309` put `Infinity` on
+   every barbell row, and a stored `null` threw before the first render. */
+export function normaliseOneRM(saved) {
+  const out = {};
+  if (!saved || typeof saved !== "object") return out;
+  for (const lift of LIFTS) {
+    const kg = bounded(saved[lift.id], 1, 500);
+    if (kg !== null) out[lift.id] = kg;
+  }
+  return out;
+}
+
 const bounded = (value, lo, hi) => {
   const n = Number(value);
   return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
@@ -341,15 +361,26 @@ export function normaliseWeek(configs, count, { oneRM = {}, liftRows = null, see
     /* A barbell row saved for a gym day is not something you can do in a park,
        so it does not survive being read back for one. */
     const usable = rows.filter((row) => rowAvailable(row, env));
+    /* A snapshot that only became empty because none of it can be done where it
+       was saved is not an authored empty block, and `changeEnv` would treat it
+       as one. Drop it so that place gets built fresh instead. */
     const byEnv = {};
     for (const key of ENVS) {
       const saved = cleanRows(config?.byEnv?.[key]);
-      if (saved) byEnv[key] = saved.filter((row) => rowAvailable(row, key));
+      if (!saved) continue;
+      const usableThere = saved.filter((row) => rowAvailable(row, key));
+      if (saved.length > 0 && usableThere.length === 0) continue;
+      byEnv[key] = usableThere;
     }
     return {
       weekday: Number.isInteger(weekday) && weekday >= 0 && weekday <= 6 ? weekday : fallback.weekday,
       env,
       byEnv,
+      /* Marks a day the app added to fill out a week rather than one you set
+         up. Shrinking removes these first, so growing and shrinking back
+         returns your week instead of keeping the filler and cutting a day you
+         configured. Any edit to a day clears it. */
+      auto: config?.auto === true,
       intensity: INTENSITY_IDS.has(config?.intensity) ? config.intensity : fallback.intensity,
       rows: usable,
       locks: cleanLocks(config?.locks),

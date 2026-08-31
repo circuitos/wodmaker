@@ -8,9 +8,11 @@ Derived defaults currently used by the product:
 
 - Two sessions per week, Monday and Wednesday. Those weekdays account for 47 of the 56 timestamped entries.
 - Lower-body strength on Monday and pressing strength on Wednesday. These are the most common broad before-conditioning focuses on those days.
-- Walking-lunge or split-squat work at 3×8, followed by dumbbell rows at 3×10, for a first-time visitor's accessory defaults. They are the two most frequent supported accessory movements in the before-conditioning blocks.
+- The accessory pool and its block sizes, from the annotation described below. Dumbbell rows lead the movements the app can offer, in 6 sessions; the three most common of all, dumbbell presses, split squats and back extensions, have no movement in the catalogue and are reported as unrepresented rather than folded into the nearest match.
 
-The carry-over decay and 310-point daily planner target are planning heuristics. They are documented in `docs/DESIGN.md` and are not presented as facts extracted from this source file.
+An earlier version of this file named walking lunges and box step-ups as the most frequent accessory movements. That came from splitting entries on marker words, which read the movements inside an unlabelled conditioning piece as accessory work. Neither appears in a real accessory block once.
+
+The carry-over decay and the per-environment daily targets are planning heuristics. They are documented in `docs/DESIGN.md` and are not presented as facts extracted from this source file.
 
 ## annotations.json
 
@@ -31,3 +33,8 @@ Movement ids are the app's where one exists. Where the log records something the
 app has no movement for, the id is the honest name and the analyser reports it
 under `unrepresentedAccessory` rather than folding it into the nearest thing the
 catalogue happens to have.
+
+Four entries carry `certainty: "judgement"`, where the log does not settle the
+reading. Each has a `note` saying what the alternative would change, and
+`npm run corpus` lists them, so a count that rests on one of those calls can be
+told from a count that does not.

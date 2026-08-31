@@ -98,6 +98,10 @@ console.log(JSON.stringify({
   sessionsWithConditioning: annotations.entries.filter((e) => e.conditioning).length,
   sessionsWithBarbell: annotations.entries.filter((e) => e.lifts.length).length,
   sessionsWithAccessory: blocks.filter((block) => block.length).length,
+  /* How much of the above rests on a reading the log does not settle. Each of
+     these entries carries a note saying what the alternative would change. */
+  judgementCalls: annotations.entries.filter((entry) => entry.certainty === "judgement")
+    .map((entry) => entry.at),
   accessoryBlockSizes,
   accessorySessions,
   accessoryDose,

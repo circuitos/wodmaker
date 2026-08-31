@@ -619,4 +619,28 @@ The gym block now takes both its size and its ceiling from the log: the size dis
 
 Away from a barbell the budget governs instead, and the evidenced pool cannot always fill it, so whatever else the place allows completes the block at a low weight. That filler is not corpus support and is not described as any.
 
-Measured over 3000 draws, the gym block matches the log at 36/44/16/5 percent against 36/43/14/7, tops out at exactly 160 points, and takes 88% of its movements from the evidenced pool. Session loads still land on their targets: gym 411 against 450, park 337 against 350, home 313 against 320.
+Measured over 3000 draws, the gym block matches the log at 36/44/16/5 percent against 36/43/14/7, tops out at exactly 160 points, and takes 87% of its movements from the evidenced pool.
+
+## Second review round
+
+Six more, all reproduced. The pattern across both rounds is that the fixes were correct and the *edges* of the fixes were not.
+
+**Clearing the calendar time unmounted the app.** The worst of the round and nothing to do with the model. `new Date("2026-08-31T:00")` is an Invalid Date and `toISOString()` on it throws, and that ran inside a `useMemo` during render, so the whole app came down while you were retyping a time. Both calendar links now come from one `when` memo that returns null unless the pair parses. This is the third transient-state problem in two rounds, after `copied` and `dateOverride`; the first two were about a value outliving its day, this one about a value being briefly meaningless.
+
+**One-rep maxes were the saved thing nobody bounded.** The previous round put every number on a day through `bounded()`, but `oneRM` is persisted separately and reaches `rowsForPreset()` directly, so a stored `1e309` put `Infinity` on every barbell row and a stored `null` threw before the first render. `CLAUDE.md` had been updated to claim every saved number passed through the check, which made the gap harder to see rather than easier. `normaliseOneRM()` closes it.
+
+**Resizing still lost a week that did not start on Monday.** Shrinking kept the earliest days, which is only the same as "the days you set up" when the app's filler lands later in the week. A Friday and Saturday week grown to four days and shrunk back kept the two weekdays the app had inserted and threw both of yours away. Days the app adds now carry `auto`, any edit clears it, and shrinking removes marked days first.
+
+**A budget that is only a loop condition is not a ceiling.** Away from a barbell the draw checked the remaining budget before starting an iteration but let the chosen movement overshoot without limit, and it always took a first movement even when nothing fitted. A park day with weighted pull-ups came out at 181 points against a budget of 150. The ceiling now applies to every pick including the first, which means an empty accessory block when the lifts have spent the budget: that is the honest answer rather than a floor to enforce. The park and home budgets were re-tuned to 200 and 130 so there is room for a block alongside the lifts, and sessions still land at 415, 340 and 308 against targets of 450, 350 and 320.
+
+**A snapshot that validation emptied read as a deliberately emptied one.** `byEnv` stores what you authored per place. A saved park snapshot containing only a bench press correctly loses the bench, but the empty array that remained was truthy and `changeEnv` took it for an authored empty block, leaving the park day with nothing at all. Same shape as the `cleanRows` bug from the first round, one level up. A snapshot that nothing survives is now discarded so the place is built fresh.
+
+**Swapping a locked movement left a lock nothing could reach.** The movement left the card while `locks` and `held` went on naming it, so it could not be unticked and came back on the next redraw. Swapping now drops the lock with the movement.
+
+### On the annotation
+
+The review checked all 56 entries against the log and found no missed movements, which is the result worth having. It raised four classifications the log does not settle: a bare "Remo 3x10" read as a barbell row from the previous session's wording, an RDL inside a block the athlete labelled "Accesorios", a superset of weighted planks and V-ups that could be the piece rather than accessory work, and a "dominadas lastradas (o estrictas)" that does not say which was done. Each now carries `certainty: "judgement"` and a note saying what the alternative reading would do to the counts, and `npm run corpus` lists them. Two of the four would change a published number.
+
+### Numbers, again
+
+The evidenced share of a gym block is 87%, not the 88% published. The session-load medians moved with the budget re-tune and are now 415, 340 and 308. The review also made the fair point that the committed check asserts only a 120-point band, so it does not pin those figures; they are measurements quoted in prose, and the check is a guard against drift rather than a proof of them.

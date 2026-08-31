@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import {
   accessoryBudget, bestPresetFor, changeEnv, daySeed, defaultWeekConfig, drawAccessory, editWeekDay,
-  normaliseWeek, planWeek, presetFor, presetsFor, redrawRows, rowsForDay, rowsForPreset, targetFor,
-  weekSummary, withPreset,
+  normaliseOneRM, normaliseWeek, planWeek, presetFor, presetsFor, redrawRows, rowsForDay,
+  rowsForPreset, targetFor, weekSummary, withPreset,
 } from "../src/planner.js";
 import { sessionLoad } from "../src/generator.js";
 import { FORMATS } from "../src/formats.js";
@@ -365,5 +365,60 @@ for (const [moveId, reps, expected] of [["row_m", 500, 31], ["run_m", 400, 30], 
   assert(Math.abs(points - expected) < 2, `${moveId} at ${reps} should cost about ${expected}, got ${points.toFixed(1)}`);
   assert(accessoryRepMax(moveById(moveId)) >= reps, `${moveId} must accept a dose of ${reps}`);
 }
+
+/* One-rep maxes are persisted apart from the week and were the one saved thing
+   with no bounds check: a stored 1e309 put Infinity on every barbell row and a
+   stored null threw before the first render. */
+assert.deepEqual(normaliseOneRM({ back_squat: Number.POSITIVE_INFINITY }), {}, "an unbounded 1RM is not a 1RM");
+assert.deepEqual(normaliseOneRM(null), {}, "and neither is nothing at all");
+assert.deepEqual(normaliseOneRM({ back_squat: "120", nonsense: 5 }), { back_squat: 120 }, "known lifts, real numbers");
+for (const rm of [null, { back_squat: Number.POSITIVE_INFINITY }, { back_squat: -5 }]) {
+  for (const row of defaultWeekConfig(2, rm)[0].rows) {
+    assert(Number.isFinite(row.kg), `a poisoned 1RM must not reach a row's weight: ${row.kg}`);
+  }
+}
+
+/* The budget is a ceiling, not a loop condition. Taking the cheapest movement
+   anyway when nothing fits took a park day 21% past its budget. */
+for (const env of ["parque", "casa"]) {
+  for (let seed = 1; seed <= 200; seed += 1) {
+    const rows = rowsForDay(bestPresetFor(env), { weighted_pullup: 20 }, seed, env);
+    const { lifts, accessory } = splitRows(rows);
+    const budget = accessoryBudget(env, lifts, { weighted_pullup: 20 });
+    const spent = accessory.reduce((sum, row) => sum + accessoryPoints(row), 0);
+    assert(spent <= budget, `${env} accessory block must fit its budget: ${Math.round(spent)} of ${Math.round(budget)}`);
+  }
+}
+/* And when the lifts have spent it all, an empty block is the honest answer. */
+assert.equal(drawAccessory(1, "parque", 0).length, 0, "no budget means no accessory block");
+
+/* A saved block for a place that cannot do any of it is not an authored empty
+   block: `changeEnv` would take it for one and leave the day with nothing. */
+const stranded = normaliseWeek([{ weekday: 1, env: "gym",
+  byEnv: { parque: [{ liftId: "bench", sets: 5, reps: 4, kg: 60 }] } }], 1)[0];
+assert.equal(stranded.byEnv.parque, undefined, "a snapshot nothing survives is discarded, not emptied");
+assert(changeEnv(stranded, "parque", {}, 3).rows.length > 0, "so the park day is built fresh");
+
+/* Resizing removes the days the app added before the days you set up. */
+let week = [
+  { weekday: 5, env: "parque", rows: [], byEnv: {}, auto: false },
+  { weekday: 6, env: "casa", rows: [], byEnv: {}, auto: false },
+];
+const resize = (configs, next) => {
+  const fresh = defaultWeekConfig(next, {}, 1);
+  let merged = [...configs].sort((a, b) => a.weekday - b.weekday);
+  while (merged.length > next) {
+    const filler = merged.map((c, i) => (c.auto ? i : -1)).filter((i) => i >= 0);
+    merged.splice(filler.length ? filler[filler.length - 1] : merged.length - 1, 1);
+  }
+  const free = fresh.map((c) => c.weekday).filter((d) => !merged.some((c) => c.weekday === d));
+  while (merged.length < next && free.length) merged.push({ ...fresh[merged.length], weekday: free.pop(), auto: true });
+  return merged.sort((a, b) => a.weekday - b.weekday);
+};
+const grown = resize(resize(week, 3), 4);
+assert.equal(grown.length, 4);
+const shrunk = resize(grown, 2);
+assert.deepEqual(shrunk.map((c) => `${c.weekday}/${c.env}`), ["5/parque", "6/casa"],
+  "a Friday and Saturday week survives being grown to four days and back");
 
 console.log(`Planner check passed for deterministic 2, 3, 4, and 5-day weeks (${swapsTested} swaps, ${laddersChecked} ladders).`);
