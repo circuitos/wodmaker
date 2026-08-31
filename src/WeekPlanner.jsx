@@ -3,7 +3,7 @@ import { AXES, ENVS } from "./moves.js";
 import { CUES, INTENSITY, STRENGTH } from "./formats.js";
 import { T } from "./i18n.js";
 import { sessionLoad } from "./generator.js";
-import { WEEK_COUNTS, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, weekCount, weekSummary }
+import { WEEK_COUNTS, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, rowsForPreset, weekCount, weekSummary }
   from "./planner.js";
 import { loadPref, savePref } from "./prefs.js";
 import { asText, headline, repParts, strengthLine } from "./text.js";
@@ -19,13 +19,14 @@ function weekdayName(t, weekday) {
   return t.planner.weekdays[weekday];
 }
 
-export default function WeekPlanner({ lang, oneRM, customRows }) {
+export default function WeekPlanner({ lang, oneRM }) {
   const t = T[lang];
   const [count, setCount] = useState(() => weekCount(loadPref("weekCount", 2)));
   /* Whatever was saved is checked against the lists that own each field, so a
      preference written by an older build cannot reach the generator. */
   const [configs, setConfigs] = useState(
-    () => normaliseWeek(loadPref("weekConfigs", null), weekCount(loadPref("weekCount", 2))),
+    () => normaliseWeek(loadPref("weekConfigs", null), weekCount(loadPref("weekCount", 2)),
+      { oneRM: loadPref("oneRM", {}), liftRows: loadPref("liftRows", null) }),
   );
   const [seed, setSeed] = useState(() => loadPref("weekSeed", Math.floor(Math.random() * 2 ** 31)));
   const [copied, setCopied] = useState(false);
@@ -34,10 +35,7 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
   useEffect(() => { savePref("weekConfigs", configs); }, [configs]);
   useEffect(() => { savePref("weekSeed", seed); }, [seed]);
 
-  const plan = useMemo(
-    () => planWeek(configs, { seed, oneRM, customRows }),
-    [configs, seed, oneRM, customRows],
-  );
+  const plan = useMemo(() => planWeek(configs, { seed, oneRM }), [configs, seed, oneRM]);
   const summary = useMemo(() => weekSummary(plan), [plan]);
   /* One session per weekday: the gap between days is what carry-over decays
      over, so a day already spoken for is not offered twice. */
@@ -45,7 +43,7 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
 
   const changeCount = (next) => {
     setCount(next);
-    setConfigs(defaultWeekConfig(next));
+    setConfigs(defaultWeekConfig(next, oneRM));
   };
 
   const editDay = (index, field, value) => setConfigs(
@@ -146,9 +144,10 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
               <div className="day-config">
                 <label>
                   <span>{t.planner.focus}</span>
-                  <select value={config.focus} onChange={(event) => editDay(index, "focus", event.target.value)}>
+                  <select value={wod.plan.preset}
+                    onChange={(event) => editDay(index, "rows", rowsForPreset(event.target.value, oneRM))}>
                     {STRENGTH.map((focus) => <option key={focus.id} value={focus.id}>{t.strength[focus.id]}</option>)}
-                    {customRows.length > 0 && <option value="custom">{t.planner.currentGrid}</option>}
+                    {wod.plan.preset === "custom" && <option value="custom">{t.planner.currentGrid}</option>}
                   </select>
                 </label>
                 <label>

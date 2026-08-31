@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, weekSummary } from "../src/planner.js";
+import { daySeed, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, presetFor, rowsForPreset, weekSummary }
+  from "../src/planner.js";
 import { sessionLoad } from "../src/generator.js";
 import { FORMATS } from "../src/formats.js";
 
@@ -47,10 +48,14 @@ const stale = normaliseWeek(
    { weekday: 4, env: "casa", focus: "press", intensity: "hard" }],
   2,
 );
-assert.deepEqual(stale[0], { weekday: 1, env: "gym", focus: "lower", intensity: "auto" },
-  "an unusable saved day falls back to the default for its slot");
-assert.deepEqual(stale[1], { weekday: 4, env: "casa", focus: "press", intensity: "hard" },
-  "a valid saved day is kept exactly");
+assert.equal(stale[0].weekday, 1, "an unusable saved day falls back to the default for its slot");
+assert.equal(stale[0].env, "gym");
+assert.equal(stale[0].intensity, "auto");
+assert.equal(presetFor(stale[0].rows), "lower", "and to that slot's default strength rows");
+assert.equal(stale[1].weekday, 4, "a valid saved day is kept exactly");
+assert.equal(stale[1].env, "casa");
+assert.equal(stale[1].intensity, "hard");
+assert.equal(presetFor(stale[1].rows), "press", "a saved focus id migrates into stored rows");
 
 for (const count of [2, 3, 4, 5]) {
   const week = normaliseWeek(Array(count).fill({ weekday: 3, env: "gym", focus: "squat", intensity: "auto" }), count);
@@ -61,7 +66,7 @@ for (const count of [2, 3, 4, 5]) {
 
 const moved = editWeekDay(defaultWeekConfig(3), 2, "weekday", 2);
 assert.deepEqual(moved.map((day) => day.weekday), [1, 2, 3], "moving a day re-sorts the week");
-assert.equal(moved[1].focus, "deadlift", "the moved day keeps its own strength focus");
+assert.equal(presetFor(moved[1].rows), "deadlift", "the moved day keeps its own strength rows");
 
 /* A day the generator cannot build drops out of the plan, so plan.index, not
    position, is what pairs a card with the schedule row that produced it. */
@@ -72,5 +77,33 @@ for (const wod of partial) {
   assert.equal(wod.plan.weekday, gappy[wod.plan.index].weekday, "plan.index points at the day that built it");
   assert.equal(wod.plan.env, gappy[wod.plan.index].env);
 }
+
+/* A day owns its strength rows, so editing one day must not touch another. */
+const perDay = normaliseWeek(null, 3);
+const edited = editWeekDay(perDay, 1, "rows", rowsForPreset("full", { back_squat: 100 }));
+assert.equal(presetFor(edited[1].rows), "full", "the edited day takes the new rows");
+assert.equal(presetFor(edited[0].rows), presetFor(perDay[0].rows), "other days keep theirs");
+assert.equal(presetFor(edited[2].rows), presetFor(perDay[2].rows));
+assert.equal(edited[1].rows.find((row) => row.liftId === "back_squat").kg, 80,
+  "a preset fills kilos from the one-rep maxes on file");
+
+/* A lock keeps its movement, and its reps, across a redraw of that day. */
+const base = normaliseWeek(null, 2);
+const [firstDay] = planWeek(base, { seed: 4242 });
+const keep = firstDay.items[0];
+const withLock = base.map((day, i) => (i === 0
+  ? { ...day, locks: [{ moveId: keep.move.id, reps: keep.reps }], nonce: 7 }
+  : day));
+const [redrawn] = planWeek(withLock, { seed: 4242 });
+const held = redrawn.items.find((item) => item.move.id === keep.move.id);
+assert(held, "a locked movement survives a redraw of its day");
+assert.equal(held.reps, keep.reps, "and keeps the reps it was locked at");
+assert.notEqual(daySeed(4242, 0, 7), daySeed(4242, 0, 0), "a redraw moves that day's seed");
+assert.equal(daySeed(4242, 1, 0), daySeed(4242, 1), "and nonce 0 is the seed a day had before");
+
+/* Redrawing one day must not move the days before it. */
+const untouched = planWeek(base, { seed: 4242 });
+const after = planWeek(base.map((day, i) => (i === 1 ? { ...day, nonce: 3 } : day)), { seed: 4242 });
+assert.deepEqual(shape([after[0]]), shape([untouched[0]]), "an earlier day holds still");
 
 console.log("Planner check passed for deterministic 2, 3, 4, and 5-day weeks.");

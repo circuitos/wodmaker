@@ -1,7 +1,7 @@
 import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, intensityK } from "./formats.js";
 import { generate, sessionAxisLoad, sessionLoad } from "./generator.js";
-import { PRESET_ROWS, arrivingFromAxis, arrivingFromLifts, pctFor } from "./lifts.js";
+import { PRESET_ROWS, arrivingFromAxis, arrivingFromLifts, liftById, moveById, pctFor } from "./lifts.js";
 import { CORPUS_DEFAULTS } from "./corpus.js";
 
 /* A point on Monday is not a point still carried in full on Wednesday. This
@@ -31,18 +31,70 @@ export function weekCount(count) {
   return WEEK_COUNTS.includes(Number(count)) ? Number(count) : 2;
 }
 
-export function defaultWeekConfig(count = 2) {
+/* A strength preset, turned into rows a day can own and edit. Kilos come from
+   the one-rep maxes on file, exactly as the daily grid fills them in. */
+export function rowsForPreset(id, oneRM = {}) {
+  return (PRESET_ROWS[id] || []).map((row) => ({
+    ...row,
+    kg: oneRM[row.liftId] > 0 && row.pct ? Math.round(oneRM[row.liftId] * row.pct) : 0,
+  }));
+}
+
+const rowKey = (row) => `${row.liftId || row.moveId}:${row.sets}x${row.reps}`;
+const rowsKey = (rows) => (rows || []).map(rowKey).sort().join("|");
+
+/* Which shortcut a day's rows correspond to, or "custom" once they have been
+   edited away from all of them. The rows are the stored fact; the preset name
+   is derived, so the two can never disagree. */
+export function presetFor(rows) {
+  const key = rowsKey(rows);
+  return Object.keys(PRESET_ROWS).find((id) => rowsKey(PRESET_ROWS[id]) === key) || "custom";
+}
+
+export function defaultWeekConfig(count = 2, oneRM = {}) {
   const safeCount = weekCount(count);
   return SCHEDULES[safeCount].map((weekday, index) => ({
     weekday,
     env: "gym",
-    focus: FOCUS[safeCount][index],
     intensity: "auto",
+    rows: rowsForPreset(FOCUS[safeCount][index], oneRM),
+    locks: [],
+    nonce: 0,
   }));
 }
 
-const FOCUS_IDS = new Set([...Object.keys(PRESET_ROWS), "custom"]);
 const INTENSITY_IDS = new Set(["auto", ...INTENSITY.map((step) => step.id)]);
+
+/* A stored strength row is one of the two kinds the pricing model knows about,
+   and nothing else gets through. */
+function cleanRows(rows) {
+  if (!Array.isArray(rows)) return null;
+  return rows.map((row) => {
+    const source = row?.moveId ? moveById(row.moveId) : liftById(row?.liftId);
+    if (!source) return null;
+    const sets = Math.round(Number(row.sets));
+    const reps = Math.round(Number(row.reps));
+    if (!(sets > 0) || !(reps > 0)) return null;
+    return {
+      ...(row.moveId ? { moveId: row.moveId } : { liftId: row.liftId }),
+      sets, reps,
+      kg: Number(row.kg) > 0 ? Number(row.kg) : 0,
+      ...(row.pct > 0 ? { pct: Number(row.pct) } : {}),
+    };
+  }).filter(Boolean);
+}
+
+/* A lock keeps a movement across a redraw, and `buildCandidate` leaves a
+   locked item's reps alone, so the rep count is part of the lock rather than
+   something to recompute. */
+function cleanLocks(locks) {
+  if (!Array.isArray(locks)) return [];
+  return locks.map((lock) => {
+    const move = moveById(lock?.moveId);
+    const reps = Number(lock?.reps);
+    return move && reps > 0 ? { moveId: lock.moveId, reps } : null;
+  }).filter(Boolean);
+}
 
 /* A week is one session per weekday, in calendar order. The gap between two
    days is what carry-over decays over, so a duplicated or out-of-order day
@@ -61,16 +113,26 @@ function orderWeek(configs) {
    focus id used to reach the generator, produce no candidate, and silently
    drop that day out of the week. Every field is checked against the list that
    owns it, falling back to the default for that slot. */
-export function normaliseWeek(configs, count) {
-  const defaults = defaultWeekConfig(count);
+export function normaliseWeek(configs, count, { oneRM = {}, liftRows = null } = {}) {
+  const defaults = defaultWeekConfig(count, oneRM);
   return orderWeek(defaults.map((fallback, index) => {
     const config = Array.isArray(configs) ? configs[index] : null;
     const weekday = Number(config?.weekday);
+    /* Rows are the stored fact now. A week saved before that carried a `focus`
+       id instead, with "custom" meaning the one grid the daily view owned, so
+       it is turned into rows here rather than dropped. */
+    const rows = cleanRows(config?.rows)
+      || (config?.focus === "custom" ? cleanRows(liftRows) : null)
+      || (PRESET_ROWS[config?.focus] ? rowsForPreset(config.focus, oneRM) : null)
+      || fallback.rows;
+    const nonce = Number(config?.nonce);
     return {
       weekday: Number.isInteger(weekday) && weekday >= 0 && weekday <= 6 ? weekday : fallback.weekday,
       env: ENVS.includes(config?.env) ? config.env : fallback.env,
-      focus: FOCUS_IDS.has(config?.focus) ? config.focus : fallback.focus,
       intensity: INTENSITY_IDS.has(config?.intensity) ? config.intensity : fallback.intensity,
+      rows,
+      locks: cleanLocks(config?.locks),
+      nonce: Number.isFinite(nonce) ? nonce : 0,
     };
   }));
 }
@@ -83,8 +145,11 @@ export function editWeekDay(configs, index, field, value) {
   )));
 }
 
-export function daySeed(seed, index) {
-  return (Number(seed) + Math.imul(index + 1, 0x9E3779B1)) >>> 0;
+/* One week seed derives a stable seed per day. `nonce` is how a single day is
+   redrawn without touching the rest: it moves that day's seed only. Nonce 0
+   gives the seed the day had before per-day redraws existed. */
+export function daySeed(seed, index, nonce = 0) {
+  return (Number(seed) + Math.imul(index + 1, 0x9E3779B1) + Math.imul(Number(nonce) || 0, 0x85EBCA6B)) >>> 0;
 }
 
 export function addAxes(...vectors) {
@@ -97,16 +162,6 @@ export function addAxes(...vectors) {
 export function decayAxes(vector, calendarDays) {
   const factor = DAILY_CARRY ** Math.max(1, calendarDays);
   return Object.fromEntries(AXES.map((axis) => [axis, (vector?.[axis] || 0) * factor]));
-}
-
-export function rowsForFocus(focus, customRows = [], oneRM = {}) {
-  const source = focus === "custom" ? customRows : (PRESET_ROWS[focus] || []);
-  return source.map((row) => ({
-    ...row,
-    ...(row.liftId && oneRM[row.liftId] > 0 && row.pct
-      ? { kg: Math.round(oneRM[row.liftId] * row.pct) }
-      : {}),
-  }));
 }
 
 function strengthForRows(rows, oneRM) {
@@ -123,6 +178,7 @@ function chooseSession(config, context) {
       seed: context.seed,
       intensity: choice.k,
       strength: context.strength,
+      locked: context.locked,
       excludeMoves: context.excludeMoves,
       excludeFormats: context.excludeFormats,
     });
@@ -138,7 +194,7 @@ function chooseSession(config, context) {
    from earlier sessions. Actual work is added only once: carried fatigue
    influences composition and volume, but sessionLoad() still counts today's
    strength and conditioning, not yesterday again. */
-export function planWeek(configs, { seed = 1, oneRM = {}, customRows = [] } = {}) {
+export function planWeek(configs, { seed = 1, oneRM = {} } = {}) {
   let fatigue = Object.fromEntries(AXES.map((axis) => [axis, 0]));
   let previousWeekday = null;
   let previousMoves = [];
@@ -147,13 +203,20 @@ export function planWeek(configs, { seed = 1, oneRM = {}, customRows = [] } = {}
   return configs.map((config, index) => {
     const gap = previousWeekday == null ? 0 : (config.weekday - previousWeekday + 7) % 7 || 7;
     const carry = previousWeekday == null ? fatigue : decayAxes(fatigue, gap);
-    const strengthRows = rowsForFocus(config.focus, customRows, oneRM);
+    const strengthRows = config.rows || [];
     const strength = strengthForRows(strengthRows, oneRM);
     const arriving = arrivingFromAxis(addAxes(carry, strength.pre));
+    /* A lock names a movement and the reps it holds, because buildCandidate
+       leaves a locked item's reps alone. Anything the environment cannot do is
+       simply not locked. */
+    const locked = (config.locks || [])
+      .map((lock) => ({ move: moveById(lock.moveId), reps: lock.reps }))
+      .filter((item) => item.move);
     const chosen = chooseSession(config, {
       arriving,
       strength,
-      seed: daySeed(seed, index),
+      locked,
+      seed: daySeed(seed, index, config.nonce),
       excludeMoves: previousMoves,
       excludeFormats: previousFormat,
     });
@@ -169,12 +232,12 @@ export function planWeek(configs, { seed = 1, oneRM = {}, customRows = [] } = {}
       index,
       weekday: config.weekday,
       env: config.env,
-      focus: config.focus,
       requestedIntensity: config.intensity,
       intensity: chosen.intensity,
+      preset: presetFor(strengthRows),
       carry,
       carryPoints: Object.values(carry).reduce((sum, value) => sum + value, 0),
-      seed: daySeed(seed, index),
+      seed: daySeed(seed, index, config.nonce),
     };
 
     fatigue = addAxes(carry, sessionAxisLoad(wod));

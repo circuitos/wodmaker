@@ -410,7 +410,7 @@ export default function App() {
         </nav>
 
         {view === "week" ? (
-          <WeekPlanner lang={lang} oneRM={oneRM} customRows={liftRows} />
+          <WeekPlanner lang={lang} oneRM={oneRM} />
         ) : (
         <div className="grid">
           <aside>
