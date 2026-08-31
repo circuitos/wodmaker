@@ -1,0 +1,775 @@
+{
+  "source": "data/55_sessions.txt",
+  "note": "Structural annotation of every entry in the source log, read by hand. The log stays the record; this says where each entry's blocks begin and end. It exists because inferring block boundaries from marker words counted the movements inside an unlabelled conditioning piece as accessory work. `lifts` is barbell work against a one-rep max, `accessory` is the supplementary work between that and the piece, `conditioning` is whether the entry contains a piece at all. Movement ids are the app's where one exists; where the log records something the app has no movement for, the id is the honest name and scripts/analyze-corpus.js reports it as unrepresented. Doses are per set, and per side where the log writes them that way. Entries carrying `certainty: \"judgement\"` are classifications the log does not settle; each `note` says what the alternative reading would do to the counts. `npm run corpus` reports how many entries the counts depend on.",
+  "entries": [
+    {
+      "at": "2025-07-10T09:58",
+      "lifts": [
+        {
+          "id": "barbell_row",
+          "sets": 3,
+          "reps": 8
+        }
+      ],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2025-07-17T09:59",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2025-08-18T11:20",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2025-10-05T09:57",
+      "lifts": [
+        {
+          "id": "back_squat",
+          "sets": 4,
+          "reps": 5
+        },
+        {
+          "id": "bench",
+          "sets": 4,
+          "reps": 5
+        },
+        {
+          "id": "deadlift",
+          "sets": 4,
+          "reps": 4
+        }
+      ],
+      "accessory": [
+        {
+          "id": "db_row",
+          "sets": 3,
+          "reps": 10
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2025-11-04T09:53",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2025-12-22T09:55",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2025-12-29T10:01",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-01-07T09:58",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-01-12T09:51",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-01-14T09:55",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-01-19T09:53",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-01-21T09:50",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-01-26T09:52",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-01-28T09:57",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-02-02T09:57",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-02-04T09:58",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-02-16T09:48",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-02-18T09:54",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "db_press",
+          "sets": 4,
+          "reps": 8
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-02-23T09:58",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "split_squat",
+          "sets": 3,
+          "reps": 8
+        },
+        {
+          "id": "farmer_carry",
+          "sets": 4,
+          "reps": 30
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-02-25T09:47",
+      "lifts": [
+        {
+          "id": "back_squat",
+          "sets": 4,
+          "reps": 3
+        }
+      ],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-03-02T10:05",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "split_squat",
+          "sets": 3,
+          "reps": 8
+        },
+        {
+          "id": "side_plank",
+          "sets": 3,
+          "reps": 40
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-03-04T09:43",
+      "lifts": [
+        {
+          "id": "back_squat",
+          "sets": 4,
+          "reps": 3
+        }
+      ],
+      "accessory": [
+        {
+          "id": "db_press",
+          "sets": 4,
+          "reps": 8
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-03-09T09:47",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "split_squat",
+          "sets": 3,
+          "reps": 10
+        },
+        {
+          "id": "plank",
+          "sets": 3,
+          "reps": 40
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-03-11T10:00",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "db_press",
+          "sets": 4,
+          "reps": 10
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-03-16T09:58",
+      "lifts": [
+        {
+          "id": "barbell_row",
+          "sets": 3,
+          "reps": 8
+        }
+      ],
+      "accessory": [
+        {
+          "id": "back_extension",
+          "sets": 3,
+          "reps": 12
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-03-18T09:50",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "db_row",
+          "sets": 3,
+          "reps": 10
+        },
+        {
+          "id": "face_pull",
+          "sets": 3,
+          "reps": 15
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-03-23T10:00",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "split_squat",
+          "sets": 3,
+          "reps": 8
+        },
+        {
+          "id": "back_extension",
+          "sets": 3,
+          "reps": 12
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-03-25T09:49",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "db_press",
+          "sets": 4,
+          "reps": 8
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-04-07T09:59",
+      "lifts": [
+        {
+          "id": "barbell_row",
+          "sets": 3,
+          "reps": 10
+        }
+      ],
+      "accessory": [
+        {
+          "id": "split_squat",
+          "sets": 3,
+          "reps": 8
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-04-13T09:59",
+      "lifts": [
+        {
+          "id": "barbell_row",
+          "sets": 3,
+          "reps": 10
+        }
+      ],
+      "accessory": [
+        {
+          "id": "split_squat",
+          "sets": 3,
+          "reps": 8
+        }
+      ],
+      "conditioning": true,
+      "certainty": "judgement",
+      "note": "barbell_row is read from context: the entry writes only \"Remo 3x10\". The session two weeks earlier writes \"Remo con barra\". A dumbbell row instead would make it 16 barbell sessions and block sizes {0:28,1:9,2:13,3:4,4:2}."
+    },
+    {
+      "at": "2026-04-15T09:58",
+      "lifts": [
+        {
+          "id": "rdl",
+          "sets": 3,
+          "reps": 6
+        }
+      ],
+      "accessory": [
+        {
+          "id": "pull_up",
+          "sets": 3,
+          "reps": 10
+        },
+        {
+          "id": "sit_up",
+          "sets": 3,
+          "reps": 20
+        }
+      ],
+      "conditioning": true,
+      "certainty": "judgement",
+      "note": "The entry labels the whole block \"Accesorios\", including an RDL at 95-110 kg. It is priced as a main lift because that is what it is; the label is the athlete's, not the model's."
+    },
+    {
+      "at": "2026-04-20T09:55",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "glute_bridge",
+          "sets": 3,
+          "reps": 12
+        },
+        {
+          "id": "plank",
+          "sets": 4,
+          "reps": 40
+        },
+        {
+          "id": "v_up",
+          "sets": 4,
+          "reps": 15
+        }
+      ],
+      "conditioning": false,
+      "certainty": "judgement",
+      "note": "Read as accessory work with no conditioning piece. The four-round superset of weighted planks and V-ups with timed rest could as easily be the piece, which would give 55 conditioning sessions, 27 accessory blocks and sizes {0:29,1:10,2:12,3:3,4:2}."
+    },
+    {
+      "at": "2026-05-06T09:42",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-05-13T09:55",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "db_press",
+          "sets": 3,
+          "reps": 10
+        },
+        {
+          "id": "back_extension",
+          "sets": 3,
+          "reps": 12
+        },
+        {
+          "id": "v_up",
+          "sets": 3,
+          "reps": 15
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-05-18T09:54",
+      "lifts": [
+        {
+          "id": "hip_thrust",
+          "sets": 4,
+          "reps": 8
+        }
+      ],
+      "accessory": [
+        {
+          "id": "db_row",
+          "sets": 4,
+          "reps": 10
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-05-20T09:56",
+      "lifts": [
+        {
+          "id": "bench",
+          "sets": 6,
+          "reps": 3
+        }
+      ],
+      "accessory": [
+        {
+          "id": "db_press",
+          "sets": 3,
+          "reps": 10
+        },
+        {
+          "id": "back_extension",
+          "sets": 3,
+          "reps": 12
+        },
+        {
+          "id": "pull_up",
+          "sets": 3,
+          "reps": 8
+        },
+        {
+          "id": "farmer_carry",
+          "sets": 4,
+          "reps": 20
+        }
+      ],
+      "conditioning": false
+    },
+    {
+      "at": "2026-05-25T09:54",
+      "lifts": [
+        {
+          "id": "rdl",
+          "sets": 4,
+          "reps": 8
+        }
+      ],
+      "accessory": [
+        {
+          "id": "back_extension",
+          "sets": 3,
+          "reps": 12
+        },
+        {
+          "id": "farmer_carry",
+          "sets": 4,
+          "reps": 20
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-05-27T09:29",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "renegade_row",
+          "sets": 4,
+          "reps": 8
+        },
+        {
+          "id": "db_press",
+          "sets": 4,
+          "reps": 10
+        },
+        {
+          "id": "back_extension",
+          "sets": 3,
+          "reps": 12
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-06-12T13:09",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-06-15T09:52",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "db_row",
+          "sets": 4,
+          "reps": 10
+        },
+        {
+          "id": "ab_wheel",
+          "sets": 3,
+          "reps": 8
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-06-17T09:54",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-06-22T09:46",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-06-24T09:57",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-06-29T09:57",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "pull_up",
+          "sets": 4,
+          "reps": 6
+        },
+        {
+          "id": "ab_wheel",
+          "sets": 3,
+          "reps": 10
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-07-01T09:54",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "back_extension",
+          "sets": 3,
+          "reps": 15
+        },
+        {
+          "id": "suitcase_carry",
+          "sets": 3,
+          "reps": 20
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-07-06T09:53",
+      "lifts": [
+        {
+          "id": "lunge",
+          "sets": 3,
+          "reps": 10
+        }
+      ],
+      "accessory": [
+        {
+          "id": "pull_up",
+          "sets": 4,
+          "reps": 6
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-07-08T09:50",
+      "lifts": [],
+      "accessory": [
+        {
+          "id": "db_press",
+          "sets": 4,
+          "reps": 8
+        },
+        {
+          "id": "db_row",
+          "sets": 4,
+          "reps": 10
+        },
+        {
+          "id": "ham_curl",
+          "sets": 3,
+          "reps": 12
+        },
+        {
+          "id": "suitcase_carry",
+          "sets": 3,
+          "reps": 25
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-07-13T09:56",
+      "lifts": [
+        {
+          "id": "weighted_pullup",
+          "sets": 4,
+          "reps": 6
+        }
+      ],
+      "accessory": [],
+      "conditioning": true,
+      "certainty": "judgement",
+      "note": "\"Dominadas lastradas (o estrictas)\" offers a choice and the log does not say which was done. Read as weighted, so it counts as barbell work; strict would make it accessory work."
+    },
+    {
+      "at": "2026-07-17T10:03",
+      "lifts": [
+        {
+          "id": "barbell_row",
+          "sets": 4,
+          "reps": 10
+        }
+      ],
+      "accessory": [
+        {
+          "id": "ham_curl",
+          "sets": 3,
+          "reps": 12
+        },
+        {
+          "id": "suitcase_carry",
+          "sets": 3,
+          "reps": 25
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-07-20T09:45",
+      "lifts": [
+        {
+          "id": "weighted_pullup",
+          "sets": 4,
+          "reps": 6
+        }
+      ],
+      "accessory": [
+        {
+          "id": "split_squat",
+          "sets": 3,
+          "reps": 8
+        },
+        {
+          "id": "pallof",
+          "sets": 3,
+          "reps": 12
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-07-22T09:51",
+      "lifts": [
+        {
+          "id": "ohp",
+          "sets": 4,
+          "reps": 6
+        },
+        {
+          "id": "barbell_row",
+          "sets": 4,
+          "reps": 8
+        }
+      ],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-07-22T11:28",
+      "lifts": [
+        {
+          "id": "back_squat",
+          "sets": 5,
+          "reps": 5
+        },
+        {
+          "id": "bench",
+          "sets": 5,
+          "reps": 5
+        },
+        {
+          "id": "rdl",
+          "sets": 4,
+          "reps": 8
+        }
+      ],
+      "accessory": [
+        {
+          "id": "pull_up",
+          "sets": 4,
+          "reps": 6
+        },
+        {
+          "id": "db_row",
+          "sets": 3,
+          "reps": 10
+        },
+        {
+          "id": "farmer_carry",
+          "sets": 4,
+          "reps": 25
+        }
+      ],
+      "conditioning": true
+    },
+    {
+      "at": "2026-08-05T09:45",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-08-06T09:57",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-08-12T09:56",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    },
+    {
+      "at": "2026-08-14T10:44",
+      "lifts": [],
+      "accessory": [],
+      "conditioning": true
+    }
+  ]
+}

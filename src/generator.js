@@ -22,11 +22,14 @@ export const rnd = (n) => Math.floor(Math.random() * n);
 export const pick = (arr) => arr[rnd(arr.length)];
 export const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export function weightedFormat() {
-  const total = FORMATS.reduce((s, f) => s + f.w, 0);
+export function weightedFormat(excludeFormats = []) {
+  const excluded = new Set(excludeFormats);
+  const pool = FORMATS.filter((f) => !excluded.has(f.id));
+  const choices = pool.length ? pool : FORMATS;
+  const total = choices.reduce((s, f) => s + f.w, 0);
   let r = Math.random() * total;
-  for (const f of FORMATS) { r -= f.w; if (r <= 0) return f; }
-  return FORMATS[0];
+  for (const f of choices) { r -= f.w; if (r <= 0) return f; }
+  return choices[0];
 }
 
 /* Slot templates. Every conditioning piece in the sample set opens with a
@@ -68,6 +71,14 @@ export function roundTarget(fmt, p, dampen, intensity = 1) {
 
 /* What a finished candidate actually costs, split so the interface can show
    the parts and a week planner can compare one day against another. */
+export function sessionAxisLoad(c) {
+  const passes = c.fmt.passes(c);
+  return Object.fromEntries(AXES.map((axis) => [
+    axis,
+    c.vec[axis] * passes + (c.strength.pre[axis] || 0) * 0.9,
+  ]));
+}
+
 export function sessionLoad(c) {
   const conditioning = c.totalWork * c.fmt.passes(c);
   const strength = Object.values(c.strength.pre).reduce((s, v) => s + v, 0) * 0.9;
@@ -93,9 +104,13 @@ export function itemCost(it) {
   return it.reps * it.move.cost * (it.move.side ? 2 : 1);
 }
 
-export function buildCandidate(env, arriving, { locked = [], fixed = null, intensity = 1 } = {}) {
-  const fmt = fixed ? fixed.fmt : weightedFormat();
+export function buildCandidate(env, arriving, {
+  locked = [], fixed = null, intensity = 1, strength = arriving,
+  excludeMoves = [], excludeFormats = [],
+} = {}) {
+  const fmt = fixed ? fixed.fmt : weightedFormat(excludeFormats);
   const st = arriving;
+  const excludedMoves = new Set(excludeMoves);
   const nSlots = fixed ? null : pick(fmt.slots);
   const cap = fixed ? fixed.cap : fmt.caps ? pick(fmt.caps) : null;
   const rounds = fixed ? fixed.rounds : fmt.rounds ? pick(fmt.rounds) : fmt.id === "ladder" ? 5 : 1;
@@ -117,7 +132,10 @@ export function buildCandidate(env, arriving, { locked = [], fixed = null, inten
   for (const pat of slots) {
     if (items.length >= targetLen) break;
     if (items.some((i) => i.locked && i.move.pat === pat)) continue;
-    const pool = poolFor(pat, env).filter((m) => !used.has(m.id));
+    let pool = poolFor(pat, env).filter((m) => !used.has(m.id) && !excludedMoves.has(m.id));
+    // Diversity is a preference. A small environment must still produce a
+    // complete workout when every suitable movement appeared yesterday.
+    if (!pool.length) pool = poolFor(pat, env).filter((m) => !used.has(m.id));
     if (!pool.length) continue;
     const m = pick(pool);
     used.add(m.id);
@@ -126,7 +144,7 @@ export function buildCandidate(env, arriving, { locked = [], fixed = null, inten
   if (items.length < 2) return null;
 
   // Scale volume analytically into the band for this format.
-  const target = roundTarget(fmt, { cap, rounds }, st.dampen, intensity);
+  const target = roundTarget(fmt, { cap, rounds, slots: items.length }, st.dampen, intensity);
   const current = items.reduce((s, it) => s + itemCost(it), 0);
   if (current > 0) {
     const k = clamp(target / current, 0.55, 1.9);
@@ -135,7 +153,7 @@ export function buildCandidate(env, arriving, { locked = [], fixed = null, inten
 
   const vec = axisVector(items);
   const totalWork = items.reduce((s, it) => s + itemCost(it), 0);
-  return { fmt, cap, rounds, items, vec, totalWork, strength: st };
+  return { fmt, cap, rounds, items, vec, totalWork, arriving: st, strength };
 }
 
 /* Rejection: composition problems only. Volume is solved above. */
@@ -149,7 +167,7 @@ export function faults(c, env) {
     if (share[a] > maxShare) out.push({ k: "axis", a, hard: true });
   }
   // Conflict with the strength block: the axis it hammered gets a tighter cap.
-  for (const [a, pre] of Object.entries(c.strength.pre)) {
+  for (const [a, pre] of Object.entries((c.arriving || c.strength).pre)) {
     const cap = pre >= 80 ? 0.24 : pre >= 50 ? 0.3 : 0.36;
     if (share[a] > cap) out.push({ k: "axis", a, hard: true });
   }

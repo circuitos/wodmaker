@@ -1,0 +1,424 @@
+import assert from "node:assert/strict";
+import {
+  accessoryBudget, bestPresetFor, changeEnv, daySeed, defaultWeekConfig, drawAccessory, editWeekDay,
+  normaliseOneRM, normaliseWeek, planWeek, presetFor, presetsFor, redrawRows, rowsForDay,
+  rowsForPreset, targetFor, weekSummary, withPreset,
+} from "../src/planner.js";
+import { sessionLoad } from "../src/generator.js";
+import { FORMATS } from "../src/formats.js";
+import { MOVES } from "../src/moves.js";
+import { ladderRungs } from "../src/text.js";
+import {
+  accessoryById, accessoryPoints, accessoryRepMax, moveById, rowAvailable, splitRows,
+} from "../src/lifts.js";
+import { CORPUS_DEFAULTS } from "../src/corpus.js";
+import { PRESET_ROWS } from "../src/lifts.js";
+
+const shape = (plan) => plan.map((wod) => ({
+  format: wod.fmt.id,
+  intensity: wod.plan.intensity,
+  items: wod.items.map((item) => [item.move.id, item.reps]),
+  total: Math.round(sessionLoad(wod).total),
+}));
+
+const emom = FORMATS.find((format) => format.id === "emom");
+assert.equal(emom.passes({ cap: 12, slots: 4 }), 3);
+assert.equal(emom.passes({ cap: 12, slots: 3 }), 3, "three work minutes include the displayed rest minute");
+assert.equal(emom.passes({ cap: 10, slots: 2 }), 5);
+
+for (const count of [2, 3, 4, 5]) {
+  const config = defaultWeekConfig(count);
+  const first = planWeek(config, { seed: 20260831 });
+  const second = planWeek(config, { seed: 20260831 });
+  assert.equal(first.length, count);
+  assert.deepEqual(shape(first), shape(second), `${count}-day plan must reproduce from its seed`);
+
+  for (let index = 1; index < first.length; index += 1) {
+    assert.notEqual(first[index].fmt.id, first[index - 1].fmt.id, "adjacent formats should differ");
+    const previous = new Set(first[index - 1].items.map((item) => item.move.id));
+    assert.equal(first[index].items.some((item) => previous.has(item.move.id)), false,
+      "adjacent sessions should avoid repeated movements when the environment allows it");
+    assert(first[index].plan.carryPoints > 0, "later days must receive decayed carry-over");
+  }
+
+  const summary = weekSummary(first);
+  const summed = first.reduce((total, wod) => total + sessionLoad(wod).total, 0);
+  assert(Math.abs(summary.total - summed) < 1e-9);
+  assert(summary.total > count * 150 && summary.total < count * 500);
+}
+
+const changedSeed = planWeek(defaultWeekConfig(2), { seed: 7 });
+assert.notDeepEqual(shape(changedSeed), shape(planWeek(defaultWeekConfig(2), { seed: 8 })),
+  "Another week must produce a different plan");
+
+/* A saved preference outlives the build that wrote it. Every field is checked
+   against the list that owns it, so nothing unknown reaches the generator. */
+const stale = normaliseWeek(
+  [{ weekday: 9, env: "moon", focus: "cardio", intensity: "brutal" },
+   { weekday: 4, env: "gym", focus: "press", intensity: "hard" }],
+  2,
+);
+assert.equal(stale[0].weekday, 1, "an unusable saved day falls back to the default for its slot");
+assert.equal(stale[0].env, "gym");
+assert.equal(stale[0].intensity, "auto");
+assert.equal(presetFor(stale[0].rows), "lower", "and to that slot's default strength rows");
+assert.equal(stale[1].weekday, 4, "a valid saved day is kept exactly");
+assert.equal(stale[1].env, "gym");
+assert.equal(stale[1].intensity, "hard");
+assert.equal(presetFor(stale[1].rows), "press", "a saved focus id migrates into stored rows");
+
+/* Home has dumbbells, so a movement asking for a light-medium pair or a single
+   under about 20 kg can be done there. Anything heavier, and anything needing
+   kit that is not a dumbbell, stays at the gym. The rule is a judgement about
+   one person's equipment, so it is pinned here rather than inferred from the
+   `kg` string at run time: a future data edit that quietly sends a 32 kg
+   kettlebell home should fail this. */
+const HOME_LOADED = ["devil_press", "thruster", "clean_jerk", "db_push_press", "db_push_press_uni",
+  "db_row", "renegade_row"];
+const GYM_ONLY_LOADED = ["db_snatch", "kb_snatch", "hang_clean", "kb_swing", "slamball", "wall_ball",
+  "goblet_squat", "lunge_bag", "farmer_carry", "sandbag_carry"];
+for (const id of HOME_LOADED) {
+  assert(moveById(id).env.includes("casa"), `${id} is a light-medium dumbbell movement and works at home`);
+  assert.equal(moveById(id).env.includes("parque"), false, `${id} needs dumbbells, which do not travel to a park`);
+}
+for (const id of GYM_ONLY_LOADED) {
+  assert.equal(moveById(id).env.includes("casa"), false, `${id} needs more than a light-medium dumbbell`);
+}
+
+/* Closing that gap is what gives home any pulling at all. It used to have
+   none, which made the `nopull` warning fire on almost every home session. */
+assert(MOVES.some((move) => move.pat === "pull" && move.env.includes("casa")),
+  "home must have at least one pulling movement");
+
+/* Where you train decides the whole session, not just the conditioning piece.
+   A barbell is not available in a park, so the block you asked for is kept as
+   a request while the day shows what that place can actually give you, and
+   coming back restores it. */
+for (const env of ["gym", "parque", "casa"]) {
+  for (const preset of presetsFor(env)) {
+    for (const row of PRESET_ROWS[preset]) {
+      assert(rowAvailable(row, env), `${preset} is only offered where ${row.liftId} can be done`);
+    }
+  }
+  for (const row of rowsForDay("full", {}, 3, env)) {
+    assert(rowAvailable(row, env), `a day built for ${env} contains only what ${env} can do`);
+  }
+}
+assert.deepEqual(presetsFor("casa"), ["none"], "a living room supports no barbell block");
+assert.equal(bestPresetFor("parque"), "pull", "a park keeps weighted pull-ups rather than nothing");
+
+/* The rows you authored are kept per place you train, so a trip away and back
+   returns exactly what you left, hand edits included, and a block you cleared
+   stays cleared rather than being rebuilt from a remembered preset. */
+const rm = { back_squat: 130, rdl: 110, weighted_pullup: 20 };
+const authored = [{ liftId: "back_squat", sets: 5, reps: 7, kg: 100, pct: 0.77 },
+  { moveId: "db_row", sets: 3, reps: 10, kg: 0 }];
+let trip = { weekday: 1, env: "gym", rows: authored, byEnv: {} };
+for (const env of ["parque", "casa", "gym"]) trip = changeEnv(trip, env, rm, 7);
+assert.deepEqual(trip.rows, authored, "a hand-edited gym block survives the round trip unchanged");
+
+let cleared = { weekday: 1, env: "gym", rows: [], byEnv: {} };
+for (const env of ["parque", "gym"]) cleared = changeEnv(cleared, env, rm, 7);
+assert.deepEqual(cleared.rows, [], "a cleared block is not resurrected by leaving and returning");
+
+/* Every path that redraws a block respects the joint budget. Feeding the whole
+   budget to the accessories on top of the lifts took a park day from 155 to
+   269 points of pre-conditioning work. */
+for (let seed = 1; seed <= 60; seed += 1) {
+  const rows = rowsForDay("pull", rm, seed, "parque");
+  const again = redrawRows({ env: "parque", rows }, rm, seed + 1);
+  for (const set of [rows, again]) {
+    const { lifts, accessory } = splitRows(set);
+    const budget = accessoryBudget("parque", lifts, rm);
+    const spent = accessory.reduce((sum, row) => sum + accessoryPoints(row), 0);
+    assert(spent <= budget + 100, `a park block should respect its budget, spent ${Math.round(spent)} against ${Math.round(budget)}`);
+  }
+}
+
+/* Ticking a lock marks a movement; it must not redraw the session under you. */
+const lockBase = normaliseWeek([{ weekday: 1, env: "gym", intensity: "normal" }], 1);
+const [plain] = planWeek(lockBase, { seed: 12 });
+const ticked = planWeek(lockBase.map((c) => (
+  { ...c, locks: [{ moveId: plain.items[0].move.id, reps: plain.items[0].reps }] })), { seed: 12 })[0];
+assert.equal(ticked.fmt.id, plain.fmt.id, "ticking a lock does not change the format");
+assert.deepEqual(ticked.items.map((i) => i.move.id), plain.items.map((i) => i.move.id),
+  "ticking a lock does not change the movements");
+const heldAfter = planWeek(lockBase.map((c) => (
+  { ...c, held: [{ moveId: plain.items[0].move.id, reps: plain.items[0].reps }], nonce: 1 })), { seed: 12 })[0];
+assert(heldAfter.items.some((i) => i.move.id === plain.items[0].move.id),
+  "and the movement is kept once the day is redrawn");
+
+/* Bounds, not just signs: a saved Infinity used to make a whole week NaN. */
+const poisoned = normaliseWeek([{ weekday: 1, env: "gym", locks: [{ moveId: "burpee", reps: Number.POSITIVE_INFINITY }] },
+  { weekday: 3, env: "gym" }], 2);
+assert.equal(poisoned[0].locks.length, 0, "an unbounded lock is not a lock");
+assert.equal(normaliseWeek([{ weekday: 1, env: "gym", rows: [{ liftId: "back_squat", sets: 3, reps: 5, kg: Number.POSITIVE_INFINITY }] }], 1)[0].rows[0].kg, 0,
+  "and an unbounded weight is not a weight");
+for (const wod of planWeek(poisoned, { seed: 1 })) {
+  assert(Number.isFinite(sessionLoad(wod).total), "every day's load stays a number");
+  assert(Number.isFinite(wod.plan.carryPoints), "and so does the carry into the next");
+}
+assert(normaliseWeek([{ weekday: 1, env: "gym", rows: [{ liftId: "unicorn", sets: 3, reps: 5 }] }], 1)[0].rows.length > 0,
+  "a saved block that cleans away to nothing falls back rather than emptying the day");
+
+/* Effort targets differ by environment, and each is reachable there. */
+assert(targetFor("gym") > targetFor("parque"), "a gym day is worth more than a park day");
+assert(targetFor("parque") >= targetFor("casa"));
+for (const env of ["gym", "parque", "casa"]) {
+  const loads = [];
+  for (let seed = 1; seed <= 250; seed += 1) {
+    const preset = bestPresetFor(env);
+    const rows = rowsForDay(preset, { back_squat: 130, bench: 90, weighted_pullup: 20, barbell_row: 80 }, seed, env);
+    const [wod] = planWeek(
+      normaliseWeek([{ weekday: 1, env, preset, intensity: "auto", rows }], 1), { seed },
+    );
+    if (wod) loads.push(sessionLoad(wod).total);
+  }
+  loads.sort((a, b) => a - b);
+  const median = loads[loads.length >> 1];
+  assert(Math.abs(median - targetFor(env)) < 120,
+    `${env} should land near its ${targetFor(env)}-point target, median was ${Math.round(median)}`);
+}
+
+/* A day saved for the gym cannot be read back for a park: a barbell block is
+   not something you can do there, so it does not survive the round trip. */
+const awayFromGym = normaliseWeek(
+  [{ weekday: 1, env: "casa", focus: "press", intensity: "auto" },
+   { weekday: 3, env: "parque", focus: "full", intensity: "auto" }],
+  2,
+);
+assert.equal(splitRows(awayFromGym[0].rows).lifts.length, 0, "no barbell survives being read back at home");
+assert.equal(splitRows(awayFromGym[1].rows).lifts.length, 0, "nor a full barbell block in a park");
+for (const day of awayFromGym) {
+  for (const row of day.rows) {
+    assert(rowAvailable(row, day.env), `${row.liftId || row.moveId} must be doable at ${day.env}`);
+  }
+}
+
+for (const count of [2, 3, 4, 5]) {
+  const week = normaliseWeek(Array(count).fill({ weekday: 3, env: "gym", focus: "squat", intensity: "auto" }), count);
+  const weekdays = week.map((day) => day.weekday);
+  assert.equal(new Set(weekdays).size, count, "one session per weekday");
+  assert.deepEqual(weekdays, [...weekdays].sort((a, b) => a - b), "a week is stored in calendar order");
+}
+
+const moved = editWeekDay(defaultWeekConfig(3), 2, { weekday: 2 });
+assert.deepEqual(moved.map((day) => day.weekday), [1, 2, 3], "moving a day re-sorts the week");
+assert.equal(presetFor(moved[1].rows), "deadlift", "the moved day keeps its own strength rows");
+
+/* A day the generator cannot build drops out of the plan, so plan.index, not
+   position, is what pairs a card with the schedule row that produced it. */
+const gappy = defaultWeekConfig(3).map((day, i) => (i === 0 ? { ...day, env: "moon" } : day));
+const partial = planWeek(gappy, { seed: 20260831 });
+assert.equal(partial.length, 2, "an unbuildable day drops out rather than failing the week");
+for (const wod of partial) {
+  assert.equal(wod.plan.weekday, gappy[wod.plan.index].weekday, "plan.index points at the day that built it");
+  assert.equal(wod.plan.env, gappy[wod.plan.index].env);
+}
+
+/* A day owns its strength rows, so editing one day must not touch another. */
+const perDay = normaliseWeek(null, 3);
+const edited = editWeekDay(perDay, 1, { rows: rowsForPreset("full", { back_squat: 100 }) });
+assert.equal(presetFor(edited[1].rows), "full", "the edited day takes the new rows");
+assert.equal(presetFor(edited[0].rows), presetFor(perDay[0].rows), "other days keep theirs");
+assert.equal(presetFor(edited[2].rows), presetFor(perDay[2].rows));
+assert.equal(edited[1].rows.find((row) => row.liftId === "back_squat").kg, 80,
+  "a preset fills kilos from the one-rep maxes on file");
+
+/* A lock keeps its movement, and its reps, across a redraw of that day. */
+const base = normaliseWeek(null, 2);
+const [firstDay] = planWeek(base, { seed: 4242 });
+const keep = firstDay.items[0];
+/* `held`, not `locks`: a redraw is what promotes what you ticked into what the
+   draw honours. */
+const withLock = base.map((day, i) => (i === 0
+  ? { ...day, held: [{ moveId: keep.move.id, reps: keep.reps }], nonce: 7 }
+  : day));
+const [redrawn] = planWeek(withLock, { seed: 4242 });
+const held = redrawn.items.find((item) => item.move.id === keep.move.id);
+assert(held, "a locked movement survives a redraw of its day");
+assert.equal(held.reps, keep.reps, "and keeps the reps it was locked at");
+assert.notEqual(daySeed(4242, 0, 7), daySeed(4242, 0, 0), "a redraw moves that day's seed");
+assert.equal(daySeed(4242, 1, 0), daySeed(4242, 1), "and nonce 0 is the seed a day had before");
+
+/* Redrawing one day must not move the days before it. */
+const untouched = planWeek(base, { seed: 4242 });
+const after = planWeek(base.map((day, i) => (i === 1 ? { ...day, nonce: 3 } : day)), { seed: 4242 });
+assert.deepEqual(shape([after[0]]), shape([untouched[0]]), "an earlier day holds still");
+
+/* A swap redraws one slot inside the shape the day already has, and never
+   hands back the movement it was asked to replace. */
+let swapsTested = 0;
+for (let seed = 1; seed <= 40; seed += 1) {
+  const week = normaliseWeek(null, 2);
+  const [before] = planWeek(week, { seed });
+  for (const item of before.items) {
+    const after = planWeek(
+      week.map((day, i) => (i === 0 ? { ...day, swaps: [{ moveId: item.move.id, nonce: 0 }] } : day)),
+      { seed },
+    )[0];
+    swapsTested += 1;
+    assert.equal(after.fmt.id, before.fmt.id, "a swap keeps the format");
+    assert.equal(after.cap, before.cap);
+    assert.equal(after.rounds, before.rounds);
+    assert.equal(after.items.some((i) => i.move.id === item.move.id), false,
+      "a swap never returns the movement it replaced");
+    for (const kept of before.items.filter((i) => i.move.id !== item.move.id)) {
+      assert(after.items.some((i) => i.move.id === kept.move.id), "the other movements stay");
+    }
+  }
+}
+assert(swapsTested > 100, "the swap sweep should cover a useful number of slots");
+
+/* A ladder prints descending rungs derived from each movement's own reps, and
+   what it prints has to be the work it charges for. The format's scheme is a
+   shape: `reps` is the top rung and the ladder costs `reps * passes`. Printing
+   the literal 10-8-6-4-2 made a ladder report loads its own card could not
+   explain, which is how this was found. */
+let laddersChecked = 0;
+for (let seed = 1; seed <= 400; seed += 1) {
+  const week = normaliseWeek([{ weekday: 1, env: "gym", intensity: "auto", rows: [] }], 1);
+  const [wod] = planWeek(week, { seed });
+  if (!wod || wod.fmt.id !== "ladder") continue;
+  laddersChecked += 1;
+  for (const item of wod.items) {
+    const rungs = ladderRungs(item, wod.fmt);
+    assert.equal(rungs.length, wod.fmt.scheme.length, "one rung per step of the scheme");
+    assert.equal(rungs[0], Math.max(1, item.reps), "the top rung is the movement's dose");
+    for (let i = 1; i < rungs.length; i += 1) assert(rungs[i] <= rungs[i - 1], "rungs descend");
+    const printed = rungs.reduce((sum, rung) => sum + rung, 0);
+    const charged = item.reps * wod.fmt.passes(wod);
+    assert(Math.abs(printed - charged) <= 3,
+      `a ladder must charge for what it prints (${printed} printed vs ${charged} charged)`);
+  }
+}
+assert(laddersChecked > 20, "the ladder sweep should see a useful number of ladders");
+
+/* Every day arrives with an accessory block already ticked, drawn the way the
+   source log writes one: one to three movements, weighted by how often each
+   appears, at the dose recorded next to it. The log's own zero case is not
+   drawn from, which is a product choice and is documented as one. */
+for (const count of [2, 3, 4, 5]) {
+  for (const day of defaultWeekConfig(count, {}, 4242)) {
+    const { lifts, accessory } = splitRows(day.rows);
+    assert(accessory.length >= 1 && accessory.length <= 5,
+      `a fresh day carries one to five accessory movements, got ${accessory.length}`);
+    assert.equal(new Set(accessory.map((row) => row.moveId)).size, accessory.length, "no repeats");
+    for (const row of accessory) {
+      assert(accessoryById(row.moveId), `${row.moveId} must be offered in the grid`);
+    }
+    assert(lifts.length > 0 || presetFor(day.rows) === "none", "the barbell block is unaffected");
+  }
+}
+
+/* The draw reproduces from its seed, and different seeds give different work. */
+assert.deepEqual(drawAccessory(99), drawAccessory(99), "the accessory draw is seeded");
+assert.notDeepEqual(drawAccessory(1), drawAccessory(2), "a different seed draws differently");
+
+/* A gym block is sized the way the log sizes one, and is drawn mostly from the
+   movements the log actually records. The rest is filler for a pool that cannot
+   fill its budget, which is not corpus support and is not counted as any. */
+{
+  const sizes = {};
+  let evidenced = 0, drawn = 0;
+  const known = new Set(CORPUS_DEFAULTS.accessory.map((entry) => entry.moveId));
+  for (let seed = 1; seed <= 2000; seed += 1) {
+    const rows = drawAccessory(seed, "gym");
+    sizes[rows.length] = (sizes[rows.length] || 0) + 1;
+    for (const row of rows) { drawn += 1; if (known.has(row.moveId)) evidenced += 1; }
+  }
+  const share = (n) => (sizes[n] || 0) / 2000;
+  const log = CORPUS_DEFAULTS.accessoryBlockSizes;
+  const logShare = (n) => log[n] / CORPUS_DEFAULTS.sessionsWithAccessory;
+  for (const n of [1, 2, 3, 4]) {
+    assert(Math.abs(share(n) - logShare(n)) < 0.08,
+      `gym block size ${n} should track the log: drew ${(share(n) * 100).toFixed(0)}%, log has ${(logShare(n) * 100).toFixed(0)}%`);
+  }
+  assert(evidenced / drawn > 0.75, "most of a gym block comes from movements the log records");
+}
+
+/* Block cost stays in the range the log shows for its own accessory blocks. */
+const blockCosts = [];
+for (let seed = 1; seed <= 2000; seed += 1) {
+  blockCosts.push(drawAccessory(seed).reduce((sum, row) => sum + accessoryPoints(row), 0));
+}
+blockCosts.sort((a, b) => a - b);
+const median = blockCosts[blockCosts.length >> 1];
+assert(median > 20 && median < 110, `median accessory block should sit inside the log's own spread, got ${median}`);
+assert(blockCosts[blockCosts.length - 1] < 260, "and no block should dwarf the session it precedes");
+
+/* The barbell block and the accessory block are two parts of a session. A
+   strength shortcut names the first and must leave the second alone. */
+const withRun = [...rowsForPreset("lower", { back_squat: 130 }),
+  { moveId: "run_m", sets: 1, reps: 400, kg: 0 }];
+assert.equal(presetFor(withRun), "lower", "accessory work does not make the barbell block custom");
+const pressed = withPreset(withRun, "press", { bench: 87 });
+assert.equal(presetFor(pressed), "press", "switching the shortcut switches the lifts");
+assert.deepEqual(pressed.filter((row) => row.moveId), withRun.filter((row) => row.moveId),
+  "switching the shortcut keeps the accessory work");
+
+/* Machine and running work is priced per unit by the movement's own cost, on
+   the same scale as everything else: about 20 points to a hard minute. */
+for (const [moveId, reps, expected] of [["row_m", 500, 31], ["run_m", 400, 30], ["row_cal", 30, 30]]) {
+  assert(accessoryById(moveId), `${moveId} is offered as accessory work`);
+  const points = accessoryPoints({ moveId, sets: 1, reps, kg: 0 });
+  assert(Math.abs(points - expected) < 2, `${moveId} at ${reps} should cost about ${expected}, got ${points.toFixed(1)}`);
+  assert(accessoryRepMax(moveById(moveId)) >= reps, `${moveId} must accept a dose of ${reps}`);
+}
+
+/* One-rep maxes are persisted apart from the week and were the one saved thing
+   with no bounds check: a stored 1e309 put Infinity on every barbell row and a
+   stored null threw before the first render. */
+assert.deepEqual(normaliseOneRM({ back_squat: Number.POSITIVE_INFINITY }), {}, "an unbounded 1RM is not a 1RM");
+assert.deepEqual(normaliseOneRM(null), {}, "and neither is nothing at all");
+assert.deepEqual(normaliseOneRM({ back_squat: "120", nonsense: 5 }), { back_squat: 120 }, "known lifts, real numbers");
+for (const rm of [null, { back_squat: Number.POSITIVE_INFINITY }, { back_squat: -5 }]) {
+  for (const row of defaultWeekConfig(2, rm)[0].rows) {
+    assert(Number.isFinite(row.kg), `a poisoned 1RM must not reach a row's weight: ${row.kg}`);
+  }
+}
+
+/* The budget is a ceiling, not a loop condition. Taking the cheapest movement
+   anyway when nothing fits took a park day 21% past its budget. */
+for (const env of ["parque", "casa"]) {
+  for (let seed = 1; seed <= 200; seed += 1) {
+    const rows = rowsForDay(bestPresetFor(env), { weighted_pullup: 20 }, seed, env);
+    const { lifts, accessory } = splitRows(rows);
+    const budget = accessoryBudget(env, lifts, { weighted_pullup: 20 });
+    const spent = accessory.reduce((sum, row) => sum + accessoryPoints(row), 0);
+    assert(spent <= budget, `${env} accessory block must fit its budget: ${Math.round(spent)} of ${Math.round(budget)}`);
+  }
+}
+/* And when the lifts have spent it all, an empty block is the honest answer. */
+assert.equal(drawAccessory(1, "parque", 0).length, 0, "no budget means no accessory block");
+
+/* A saved block for a place that cannot do any of it is not an authored empty
+   block: `changeEnv` would take it for one and leave the day with nothing. */
+const stranded = normaliseWeek([{ weekday: 1, env: "gym",
+  byEnv: { parque: [{ liftId: "bench", sets: 5, reps: 4, kg: 60 }] } }], 1)[0];
+assert.equal(stranded.byEnv.parque, undefined, "a snapshot nothing survives is discarded, not emptied");
+assert(changeEnv(stranded, "parque", {}, 3).rows.length > 0, "so the park day is built fresh");
+
+/* Resizing removes the days the app added before the days you set up. */
+let week = [
+  { weekday: 5, env: "parque", rows: [], byEnv: {}, auto: false },
+  { weekday: 6, env: "casa", rows: [], byEnv: {}, auto: false },
+];
+const resize = (configs, next) => {
+  const fresh = defaultWeekConfig(next, {}, 1);
+  let merged = [...configs].sort((a, b) => a.weekday - b.weekday);
+  while (merged.length > next) {
+    const filler = merged.map((c, i) => (c.auto ? i : -1)).filter((i) => i >= 0);
+    merged.splice(filler.length ? filler[filler.length - 1] : merged.length - 1, 1);
+  }
+  const free = fresh.map((c) => c.weekday).filter((d) => !merged.some((c) => c.weekday === d));
+  while (merged.length < next && free.length) merged.push({ ...fresh[merged.length], weekday: free.pop(), auto: true });
+  return merged.sort((a, b) => a.weekday - b.weekday);
+};
+const grown = resize(resize(week, 3), 4);
+assert.equal(grown.length, 4);
+const shrunk = resize(grown, 2);
+assert.deepEqual(shrunk.map((c) => `${c.weekday}/${c.env}`), ["5/parque", "6/casa"],
+  "a Friday and Saturday week survives being grown to four days and back");
+
+console.log(`Planner check passed for deterministic 2, 3, 4, and 5-day weeks (${swapsTested} swaps, ${laddersChecked} ladders).`);

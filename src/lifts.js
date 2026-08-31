@@ -26,29 +26,29 @@ export const REP_AT_75 = 5;
 export const REF_PCT = 0.75;
 
 export const LIFTS = [
-  { id: "back_squat", es: "sentadilla trasera", en: "back squat", bar: 20, toll: 1.0,
+  { id: "back_squat", es: "sentadilla trasera", en: "back squat", bar: 20, toll: 1.0, env: ["gym"],
     load: { piernas: 0.64, posterior: 0.21, core: 0.15 } },
-  { id: "front_squat", es: "sentadilla frontal", en: "front squat", bar: 20, toll: 1.0,
+  { id: "front_squat", es: "sentadilla frontal", en: "front squat", bar: 20, toll: 1.0, env: ["gym"],
     load: { piernas: 0.60, posterior: 0.15, core: 0.25 } },
-  { id: "deadlift", es: "peso muerto", en: "deadlift", bar: 20, toll: 2.0,
+  { id: "deadlift", es: "peso muerto", en: "deadlift", bar: 20, toll: 2.0, env: ["gym"],
     load: { posterior: 0.51, agarre: 0.24, piernas: 0.14, core: 0.11 } },
-  { id: "rdl", es: "peso muerto rumano", en: "Romanian deadlift", bar: 20, toll: 1.5,
+  { id: "rdl", es: "peso muerto rumano", en: "Romanian deadlift", bar: 20, toll: 1.5, env: ["gym"],
     load: { posterior: 0.58, agarre: 0.22, piernas: 0.10, core: 0.10 } },
-  { id: "hip_thrust", es: "hip thrust", en: "hip thrust", bar: 20, toll: 0.8,
+  { id: "hip_thrust", es: "hip thrust", en: "hip thrust", bar: 20, toll: 0.8, env: ["gym"],
     load: { posterior: 0.70, piernas: 0.20, core: 0.10 } },
-  { id: "lunge", es: "zancadas con barra", en: "barbell lunge", bar: 20, toll: 1.0,
+  { id: "lunge", es: "zancadas con barra", en: "barbell lunge", bar: 20, toll: 1.0, env: ["gym"],
     load: { piernas: 0.62, posterior: 0.23, core: 0.15 } },
-  { id: "bench", es: "press banca", en: "bench press", bar: 20, toll: 1.0,
+  { id: "bench", es: "press banca", en: "bench press", bar: 20, toll: 1.0, env: ["gym"],
     load: { empuje: 0.74, core: 0.17, traccion: 0.09 } },
-  { id: "ohp", es: "press militar", en: "overhead press", bar: 20, toll: 1.1,
+  { id: "ohp", es: "press militar", en: "overhead press", bar: 20, toll: 1.1, env: ["gym"],
     load: { empuje: 0.68, core: 0.24, traccion: 0.08 } },
-  { id: "push_press", es: "push press", en: "push press", bar: 20, toll: 1.0,
+  { id: "push_press", es: "push press", en: "push press", bar: 20, toll: 1.0, env: ["gym"],
     load: { empuje: 0.58, piernas: 0.20, core: 0.22 } },
-  { id: "weighted_pullup", es: "dominadas lastradas", en: "weighted pull-up", bar: 0, toll: 1.0,
+  { id: "weighted_pullup", es: "dominadas lastradas", en: "weighted pull-up", bar: 0, toll: 1.0, env: ["gym", "parque"],
     load: { traccion: 0.61, agarre: 0.29, core: 0.10 } },
-  { id: "barbell_row", es: "remo con barra", en: "barbell row", bar: 20, toll: 1.0,
+  { id: "barbell_row", es: "remo con barra", en: "barbell row", bar: 20, toll: 1.0, env: ["gym"],
     load: { traccion: 0.55, agarre: 0.25, posterior: 0.12, core: 0.08 } },
-  { id: "power_clean", es: "cargada de potencia", en: "power clean", bar: 20, toll: 1.6,
+  { id: "power_clean", es: "cargada de potencia", en: "power clean", bar: 20, toll: 1.6, env: ["gym"],
     load: { posterior: 0.38, piernas: 0.25, traccion: 0.17, agarre: 0.12, core: 0.08 } },
 ];
 
@@ -96,9 +96,65 @@ export const ACCESSORY = [
   { moveId: "sit_up", refKg: 0 },
   { moveId: "v_up", refKg: 0 },
   { moveId: "plank", refKg: 0 },
+  /* Machine and running work belongs here as well as in a conditioning piece:
+     it is common between the barbell and the WOD, and running in particular is
+     the one piece of supplementary work that needs no equipment at all. Priced
+     per unit by the movement's own `cost`, same as every other accessory, so a
+     500 m row is about 31 points and 400 m of running about 30. */
+  /* Evidenced as accessory work in the source log and already in `MOVES`, so
+     offering them costs nothing: pull-ups in 5 sessions, farmer carries in 4,
+     renegade rows and side planks in 1 each. */
+  { moveId: "pull_up", refKg: 0 },
+  { moveId: "farmer_carry", refKg: 0 },
+  { moveId: "renegade_row", refKg: 30 },
+  { moveId: "side_plank", refKg: 0 },
+  { moveId: "row_cal", refKg: 0 },
+  { moveId: "row_m", refKg: 0 },
+  { moveId: "run_m", refKg: 0 },
 ];
 
+/* A row is one of two kinds and they are two different blocks of a session:
+   heavy barbell work against a one-rep max, and the supplementary work that
+   sits between it and the conditioning piece. They are priced differently
+   already; this is what lets them be shown separately too. */
+export function splitRows(rows = []) {
+  return {
+    lifts: rows.filter((row) => row.liftId),
+    accessory: rows.filter((row) => row.moveId),
+  };
+}
+
+/* A fresh accessory row. Movements counted in reps take the usual three sets
+   of eight. A distance, calorie or time piece takes one set of the dose the
+   movement is normally prescribed at, because "3x8 m" is not a thing and a
+   24-second plank was not intended either. */
+export function defaultAccessoryRow(moveId) {
+  const move = moveById(moveId);
+  return move && move.unit !== "reps"
+    ? { moveId, sets: 1, reps: move.dose[1], kg: 0 }
+    : { moveId, sets: 3, reps: 8, kg: 0 };
+}
+
+/* How much of a movement one accessory set can hold. Reps cap at 60, but a
+   distance or calorie piece is written in hundreds of metres, so the ceiling
+   comes from the movement's own prescribed dose. */
+export function accessoryRepMax(move) {
+  return move ? Math.max(60, move.dose[1] * 5) : 60;
+}
+
 export const accessoryById = (id) => ACCESSORY.find((a) => a.moveId === id);
+
+/* What you can actually do where you are. A barbell lift needs a barbell, so
+   every one of them is gym-only; a weighted pull-up needs something to hang
+   from, which the park has. Accessory work inherits availability from the
+   movement it names, which `MOVES` already records. */
+export const liftsFor = (env) => LIFTS.filter((lift) => lift.env.includes(env));
+export const accessoriesFor = (env) => ACCESSORY.filter(
+  (acc) => moveById(acc.moveId)?.env.includes(env),
+);
+export const rowAvailable = (row, env) => (row.liftId
+  ? !!liftById(row.liftId)?.env.includes(env)
+  : !!moveById(row.moveId)?.env.includes(env));
 export const moveById = (id) => MOVES.find((m) => m.id === id);
 
 /* Points for one accessory row. `reps` is per set, and per side where the
@@ -126,9 +182,21 @@ const DAMP_PER_POINT = 0.000659;
 const DAMP_PER_LEG_POINT = 0.000608;
 const LEG_AXES = ["piernas", "posterior"];
 
+/* Turn any axis vector into the `arriving` shape the generator consumes.
+   Strength rows use this below, and the week planner uses the same function
+   for fatigue carried from earlier sessions. Keeping the conversion here
+   means both sources agree on how total and leg-heavy work suppress what
+   follows. */
+export function arrivingFromAxis(pre = {}) {
+  const points = Object.values(pre).reduce((sum, value) => sum + value, 0);
+  const legPoints = LEG_AXES.reduce((sum, axis) => sum + (pre[axis] || 0), 0);
+  const legShare = points > 0 ? legPoints / points : 0;
+  const drop = points * (DAMP_PER_POINT + DAMP_PER_LEG_POINT * legShare);
+  return { pre, dampen: Math.max(0.55, 1 - drop), points };
+}
+
 export function arrivingFromLifts(rows) {
   const pre = {};
-  let points = 0, legPoints = 0;
 
   for (const row of rows) {
     // A row is either a main lift, priced against a one-rep max, or accessory
@@ -136,16 +204,11 @@ export function arrivingFromLifts(rows) {
     const source = row.moveId ? moveById(row.moveId) : liftById(row.liftId);
     const p = row.moveId ? accessoryPoints(row) : liftPoints(row);
     if (!source || p <= 0) continue;
-    points += p;
     for (const [axis, share] of Object.entries(source.load)) {
       pre[axis] = (pre[axis] || 0) + p * share;
-      if (LEG_AXES.includes(axis)) legPoints += p * share;
     }
   }
-
-  const legShare = points > 0 ? legPoints / points : 0;
-  const drop = points * (DAMP_PER_POINT + DAMP_PER_LEG_POINT * legShare);
-  return { pre, dampen: Math.max(0.55, 1 - drop), points };
+  return arrivingFromAxis(pre);
 }
 
 /* The seven old presets, kept as one-tap shortcuts. Each is now just a set of

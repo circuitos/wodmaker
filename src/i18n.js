@@ -1,6 +1,6 @@
 export const T = {
   es: {
-    title: "Generador de WOD", sub: "A partir de 55 sesiones reales",
+    title: "Generador de WOD", sub: "A partir del registro original",
     where: "Dónde entrenas", effort: "Cuánto aprietas",
     intensity: { soft: "suave", normal: "normal", hard: "duro" }, gym: "Gimnasio", parque: "Parque", casa: "Casa",
     whereHint: { gym: "Todo el material", parque: "Barra de dominadas, banco, suelo", casa: "Sin material" },
@@ -26,9 +26,18 @@ export const T = {
     },
     at: "a las", addCal: "Añadir al calendario", download: "Descargar .ics", gcal: "Google Calendar",
     total: "trabajo total", perRound: "por ronda", perMin: "por minuto",
+    planner: {
+      today: "Día", week: "Semana", title: "Plan de la semana",
+      note: "Cada día evita repetir el anterior y llega con la fatiga acumulada ya descontada.",
+      sessions: "Sesiones por semana", weeklyLoad: "Carga semanal", points: "puntos",
+      another: "Otra semana", copy: "Copiar semana", day: "Día", focus: "Fuerza",
+      currentGrid: "Bloque actual", auto: "auto", conditioning: "condicionamiento",
+      strength: "fuerza", carry: "fatiga previa", weekday: "Día de la semana", openDay: "Editar día",
+      weekdays: { 0: "Domingo", 1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado" },
+    },
   },
   en: {
-    title: "WOD Generator", sub: "Built from 55 real sessions",
+    title: "WOD Generator", sub: "Built from the original training log",
     where: "Where you train", effort: "How hard",
     intensity: { soft: "soft", normal: "normal", hard: "hard" }, gym: "Gym", parque: "Park", casa: "Home",
     whereHint: { gym: "Full equipment", parque: "Pull-up bar, bench, ground", casa: "No equipment" },
@@ -54,6 +63,15 @@ export const T = {
     },
     at: "at", addCal: "Add to calendar", download: "Download .ics", gcal: "Google Calendar",
     total: "total work", perRound: "per round", perMin: "per minute",
+    planner: {
+      today: "Day", week: "Week", title: "Week plan",
+      note: "Each day avoids repeating the previous one and arrives with accumulated fatigue already accounted for.",
+      sessions: "Sessions per week", weeklyLoad: "Weekly load", points: "points",
+      another: "Another week", copy: "Copy week", day: "Day", focus: "Strength",
+      currentGrid: "Current block", auto: "auto", conditioning: "conditioning",
+      strength: "strength", carry: "carried fatigue", weekday: "Day of the week", openDay: "Edit day",
+      weekdays: { 0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday" },
+    },
   },
 };
 

@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "lint": "oxlint",
     "build:site": "node scripts/build-preview-site.mjs",
+    "corpus": "node scripts/analyze-corpus.js",
+    "check:planner": "node scripts/check-planner.js",
     "smoke": "node scripts/smoke.js",
     "smoke:quick": "SAMPLES=100 node scripts/smoke.js"
   },

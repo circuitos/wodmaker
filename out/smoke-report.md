@@ -15,33 +15,33 @@ Load in points, where 20 points is about one hard minute of work.
 
 | Format | Share | Cond mean | Cond p10 | Cond p90 | Load mean | Load min | Load max | Items | Hard faults |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| amrap | 22.7% | 190.6 | 146 | 234 | 321.7 | 131 | 522 | 3.8 | 0.000 |
-| fortime | 24.1% | 174.8 | 149 | 206 | 308.6 | 160 | 547 | 4.5 | 0.000 |
-| emom | 24.1% | 226.0 | 125 | 343 | 352.5 | 112 | 748 | 2.9 | 0.000 |
-| intervals | 6.1% | 81.5 | 59 | 108 | 209.0 | 55 | 386 | 2.0 | 0.000 |
-| ladder | 9.3% | 91.4 | 78 | 105 | 213.9 | 90 | 362 | 2.9 | 0.000 |
-| chipper | 7.8% | 132.6 | 121 | 152 | 265.5 | 93 | 368 | 4.3 | 0.000 |
-| quality | 5.8% | 74.5 | 54 | 92 | 198.8 | 38 | 315 | 3.4 | 0.000 |
+| amrap | 24.1% | 197.3 | 151 | 245 | 327.6 | 150 | 547 | 3.9 | 0.000 |
+| fortime | 22.0% | 179.9 | 149 | 221 | 316.1 | 160 | 531 | 4.6 | 0.000 |
+| emom | 24.9% | 130.5 | 97 | 164 | 256.7 | 70 | 392 | 3.0 | 0.000 |
+| intervals | 6.0% | 87.3 | 59 | 126 | 208.7 | 55 | 404 | 2.0 | 0.000 |
+| ladder | 9.8% | 94.4 | 79 | 113 | 217.4 | 90 | 372 | 3.0 | 0.000 |
+| chipper | 7.8% | 133.0 | 121 | 153 | 267.1 | 119 | 368 | 4.4 | 0.000 |
+| quality | 5.5% | 76.9 | 58 | 93 | 203.2 | 38 | 316 | 3.5 | 0.000 |
 
 ## Session load by environment
 
 | Environment | Load mean | p10 | p90 | Items | Hard faults |
 |---|---:|---:|---:|---:|---:|
-| gym | 304.5 | 191 | 426 | 3.6 | 0.000 |
-| parque | 293.7 | 184 | 412 | 3.6 | 0.000 |
-| casa | 294.6 | 190 | 399 | 3.6 | 0.000 |
+| gym | 276.3 | 182 | 372 | 3.6 | 0.000 |
+| parque | 270.5 | 179 | 366 | 3.6 | 0.000 |
+| casa | 287.3 | 186 | 388 | 3.7 | 0.000 |
 
 ## Session load by strength block
 
 | Strength | Load mean | p10 | p90 | Items | Hard faults |
 |---|---:|---:|---:|---:|---:|
-| none | 173.2 | 90 | 248 | 3.5 | 0.000 |
-| squat | 284.4 | 203 | 363 | 3.5 | 0.000 |
-| deadlift | 327.4 | 242 | 414 | 3.6 | 0.000 |
-| press | 280.3 | 193 | 355 | 3.6 | 0.000 |
-| pull | 293.2 | 207 | 379 | 3.5 | 0.000 |
-| lower | 328.9 | 245 | 411 | 3.6 | 0.000 |
-| full | 395.6 | 314 | 470 | 3.7 | 0.000 |
+| none | 157.3 | 94 | 223 | 3.5 | 0.000 |
+| squat | 267.3 | 204 | 334 | 3.6 | 0.000 |
+| deadlift | 304.0 | 242 | 368 | 3.6 | 0.000 |
+| press | 259.5 | 194 | 329 | 3.7 | 0.000 |
+| pull | 273.1 | 209 | 346 | 3.5 | 0.000 |
+| lower | 305.5 | 245 | 369 | 3.7 | 0.000 |
+| full | 379.5 | 317 | 444 | 3.9 | 0.000 |
 
 ## Axis shares
 
@@ -49,19 +49,19 @@ Share of total effort taken by each axis, averaged over every workout.
 
 | Axis | Mean | p10 | p90 |
 |---|---:|---:|---:|
-| piernas | 0.225 | 0.106 | 0.344 |
-| posterior | 0.146 | 0.028 | 0.256 |
-| empuje | 0.181 | 0.017 | 0.341 |
-| traccion | 0.096 | 0.000 | 0.257 |
-| core | 0.288 | 0.204 | 0.353 |
-| agarre | 0.064 | 0.000 | 0.152 |
+| piernas | 0.207 | 0.095 | 0.333 |
+| posterior | 0.135 | 0.000 | 0.252 |
+| empuje | 0.167 | 0.014 | 0.314 |
+| traccion | 0.133 | 0.000 | 0.283 |
+| core | 0.274 | 0.181 | 0.350 |
+| agarre | 0.085 | 0.000 | 0.155 |
 
 ## Warnings raised
 
 | Warning | Count | Per workout |
 |---|---:|---:|
-| nopull | 2616 | 0.311 |
-| grip | 15 | 0.002 |
+| nopull | 1282 | 0.153 |
+| grip | 14 | 0.002 |
 
 ## Movement frequency
 
@@ -69,57 +69,57 @@ Movements that never appear are unreachable: check their `env` and `pat`.
 
 | Movement | Count | Share of slots |
 |---|---:|---:|
-| burpee | 2494 | 0.083 |
-| bear_crawl | 2298 | 0.076 |
-| push_up | 1847 | 0.061 |
-| pull_up | 1677 | 0.056 |
-| glute_bridge | 1653 | 0.055 |
-| superman | 1462 | 0.049 |
-| plank | 1383 | 0.046 |
-| pike_push_up | 1107 | 0.037 |
-| jacks | 998 | 0.033 |
-| hollow | 956 | 0.032 |
-| mtn_climb | 888 | 0.030 |
-| side_plank | 839 | 0.028 |
-| high_knees | 785 | 0.026 |
-| run_m | 740 | 0.025 |
-| broad_jump | 680 | 0.023 |
-| knee_raise | 670 | 0.022 |
-| sit_up | 637 | 0.021 |
-| walking_lunge | 578 | 0.019 |
-| step_up | 563 | 0.019 |
-| air_squat | 449 | 0.015 |
-| skips | 394 | 0.013 |
+| bear_crawl | 2208 | 0.072 |
+| pull_up | 1683 | 0.055 |
+| glute_bridge | 1468 | 0.048 |
+| db_row | 1339 | 0.044 |
+| superman | 1335 | 0.044 |
+| push_up | 1317 | 0.043 |
+| plank | 1176 | 0.038 |
+| jacks | 1089 | 0.036 |
+| burpee | 1007 | 0.033 |
+| hollow | 996 | 0.033 |
+| side_plank | 926 | 0.030 |
+| mtn_climb | 904 | 0.030 |
+| high_knees | 874 | 0.029 |
+| sit_up | 785 | 0.026 |
+| run_m | 749 | 0.025 |
+| renegade_row | 700 | 0.023 |
+| knee_raise | 676 | 0.022 |
+| db_push_press | 642 | 0.021 |
+| devil_press | 611 | 0.020 |
+| broad_jump | 582 | 0.019 |
+| pike_push_up | 575 | 0.019 |
+| v_up | 523 | 0.017 |
+| walking_lunge | 514 | 0.017 |
+| step_up | 505 | 0.017 |
+| thruster | 484 | 0.016 |
+| air_squat | 425 | 0.014 |
+| clean_jerk | 409 | 0.013 |
+| skips | 395 | 0.013 |
 | burpee_bjo | 392 | 0.013 |
-| toes_to_bar | 380 | 0.013 |
-| v_up | 376 | 0.013 |
+| toes_to_bar | 387 | 0.013 |
 | row_m | 372 | 0.012 |
-| db_row | 353 | 0.012 |
+| db_push_press_uni | 367 | 0.012 |
 | ring_row | 341 | 0.011 |
-| slamball | 333 | 0.011 |
-| bike_cal | 320 | 0.011 |
-| box_step_over | 313 | 0.010 |
+| slamball | 331 | 0.011 |
+| bike_cal | 320 | 0.010 |
+| box_step_over | 314 | 0.010 |
 | farmer_carry | 306 | 0.010 |
-| row_cal | 303 | 0.010 |
-| db_push_press | 285 | 0.009 |
-| ski_cal | 275 | 0.009 |
+| row_cal | 298 | 0.010 |
+| ski_cal | 279 | 0.009 |
 | suitcase_carry | 275 | 0.009 |
-| cossack | 273 | 0.009 |
-| sandbag_carry | 256 | 0.009 |
-| kb_swing | 249 | 0.008 |
-| renegade_row | 236 | 0.008 |
-| db_push_press_uni | 160 | 0.005 |
-| ring_push_up | 155 | 0.005 |
-| box_jump | 135 | 0.004 |
-| ring_dip | 115 | 0.004 |
-| lunge_bag | 102 | 0.003 |
-| goblet_squat | 89 | 0.003 |
+| sandbag_carry | 256 | 0.008 |
+| kb_swing | 251 | 0.008 |
+| cossack | 221 | 0.007 |
+| ring_push_up | 152 | 0.005 |
+| box_jump | 141 | 0.005 |
+| ring_dip | 118 | 0.004 |
+| lunge_bag | 101 | 0.003 |
+| goblet_squat | 90 | 0.003 |
 | hang_clean | 85 | 0.003 |
-| devil_press | 81 | 0.003 |
-| db_snatch | 81 | 0.003 |
-| thruster | 78 | 0.003 |
-| wall_ball | 76 | 0.003 |
-| clean_jerk | 64 | 0.002 |
+| db_snatch | 83 | 0.003 |
+| wall_ball | 77 | 0.003 |
 | box_jump_over | 56 | 0.002 |
-| kb_snatch | 50 | 0.002 |
+| kb_snatch | 49 | 0.002 |
 

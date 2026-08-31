@@ -6,13 +6,22 @@
    The round target is load / passes, and the finished session's cost is
    totalWork * passes. One number to change, and both move together. See
    docs/DESIGN.md. */
+/* An EMOM item repeats once per cycle, not once per minute. Three work items
+   have the fourth-minute rest rendered by the card, so both three- and
+   four-item versions use a four-minute cycle. */
+export function emomPasses(p) {
+  const slots = p.items?.length || p.slots || 1;
+  const cycle = slots === 3 ? 4 : slots;
+  return p.cap / cycle;
+}
+
 export const FORMATS = [
   { id: "amrap",     w: 22, caps: [8, 10, 12],        slots: [3, 4, 5], scale: 1.0,
     load: (p) => p.cap * 20.5,  passes: () => 5 },
   { id: "fortime",   w: 28, rounds: [3, 4, 5],        slots: [4, 5, 6], scale: 1.0,
     load: () => 190,            passes: (p) => p.rounds },
   { id: "emom",      w: 20, caps: [8, 10, 12],        slots: [2, 3, 4], scale: 0.9,
-    load: (p) => p.cap * 15,    passes: (p) => p.cap },
+    load: (p) => p.cap * 15,    passes: emomPasses },
   { id: "intervals", w: 10, rounds: [5, 6],           slots: [1, 2],    scale: 0.55,
     load: (p) => p.rounds * 13.5, passes: (p) => p.rounds },
   { id: "ladder",    w: 8,  scheme: [10, 8, 6, 4, 2], slots: [3],       scale: 1.0,
@@ -81,3 +90,11 @@ export const CUES = {
     quality: ["Quality over speed.", "No rush; control every rep."],
   },
 };
+
+/* Which cue a session shows. Derived from the session's own seed rather than
+   drawn at render time, so the line holds still while you edit the day and
+   the card, the copied text and the week overview all quote the same one. */
+export function cueFor(wod, lang) {
+  const cues = CUES[lang][wod.fmt.id];
+  return cues[(wod.plan?.seed ?? 0) % cues.length];
+}

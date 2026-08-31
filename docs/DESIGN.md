@@ -79,6 +79,8 @@ Three things the sweep found that reading the code did not.
 
 This does not have to be fixed to unify the model, and it should not be fixed in the same commit. Step 3 preserves whatever the clamps do today by construction, because it sets each format's `load` to the current band midpoint times the current pass count. Worth a separate decision afterwards: either raise the EMOM band to something reachable, or accept that quantisation is the real floor and say so.
 
+**Resolved as week-planner groundwork.** The band was not the real mistake. `passes` said every EMOM item happened once per minute, so a 12-minute, four-movement piece multiplied all four movements by 12 instead of by 3. The generator then divided the session target by that same 12, asked for an impossibly small movement list, and hit the quantisation floors described above. `emomPasses()` now uses `cap / cycle`: two movements repeat five times in ten minutes; four repeat three times in twelve; three work movements also repeat three times because the card renders minute four as rest. The 8400-workout sweep moves EMOM conditioning from a 226-point mean and 748-point maximum full session to 130 and 387. Hard faults remain zero.
+
 **The `nopull` warning fires on 93.7% of home workouts.** Not 31% as the overall count suggests: it is zero at the gym and in the park, and nearly universal at home. A warning that fires on almost every session in its category carries no information, so today it reads as decoration. `CLAUDE.md` already names the cause in its gotchas: there is no home-friendly pulling movement in `MOVES`, and the fix is a movement, not a scorer tweak. The number just says how bad it is.
 
 **Nothing ever degrades.** Zero of 8400 workouts came back carrying a hard fault, so the 300-candidate loop in `generate()` always finds a clean one. The fallback path exists and is correct, but it has never been the thing that runs. Good to know before trusting it to absorb anything.
@@ -153,7 +155,7 @@ Two float details, checked rather than assumed. `fortime` at 3 rounds now comput
 
 **The multipliers are calibrated against what they deliver rather than what they read.** Asking for 0.8 does not produce 80% of the work: `quantise` floors every movement at half its minimum dose and `buildCandidate` clamps rep scaling at 0.55, so about 60% of the request survives. Measured over 3000 workouts a step, 0.6 gives -16% and 1.4 gives +24%, a 1.47x span from soft to hard, or 7.7 against 11.3 hard minutes.
 
-The asymmetry is a fact rather than an oversight. Reps can be scaled up but the floors stop them going down, so about -16% is the softest this mechanism reaches at all. A genuinely light session would need fewer movements or fewer rounds, which is a different change and not one this commit makes. It is the same clamp that makes the EMOM band unreachable, showing up in a second place.
+The asymmetry is a fact rather than an oversight. Reps can be scaled up but the floors stop them going down, so about -16% is the softest this mechanism reaches at all. A genuinely light session would need fewer movements or fewer rounds, which is a different change and not one this commit makes.
 
 **5. Generalise `pre` from a strength block to an arriving axis load.** Groundwork for the week planner, per the section above. Its own commit, after the load model is unified, and before any planner work starts.
 
@@ -332,7 +334,7 @@ Section 5 keeps one seed in a ref (`seedRef`, not state: reading it never needs 
 - **A new seed:** first mount, changing where you train, or pressing "Another". These are the moments that mean "give me a different session."
 - **The same seed, reused:** ticking a strength row or moving the soft/normal/hard chip. `roll(false, false)` calls `generate()` again with the unchanged `seedRef.current`.
 
-That works because of what does and does not feed into the random draws. Format, slot pattern, and which movements get picked all come from `Math.random()` calls that know nothing about `arriving` or `intensity`; only the final rep-scaling step reads them. So the same seed with a different strength load or a different chip reproduces the same format and the same movements, and only the numbers move. Verified over 30 seeds, comparing `intensity: 1.0` against `intensity: 1.4`: format identical in 30/30, movement set identical in 30/30, reps changed in 22/30 (the other 8 are the EMOM clamp already on record elsewhere in this document, not a new issue).
+That works because of what does and does not feed into the random draws. Format, slot pattern, and which movements get picked all come from `Math.random()` calls that know nothing about `arriving` or `intensity`; only the final rep-scaling step reads them. So the same seed with a different strength load or a different chip reproduces the same format and the same movements, and only the numbers move. Rechecked after the EMOM pass fix over 30 seeds, comparing `intensity: 1.0` against `intensity: 1.4`: format identical in 30/30, movement set identical in 30/30, reps changed in 29/30.
 
 **The one place this can still move the shape.** `generate()` tries up to 300 candidates and returns the first with zero hard faults. Faults depend on `arriving.pre`, so a candidate that passed before could fail now, or the reverse, which changes how many candidates the loop consumes before it stops and therefore how far into the seeded stream the accepted one sits. In the measured data this is not a real risk: the smoke sweep found 0 of 8400 workouts carrying a hard fault, so the loop accepts the very first candidate essentially always. Recorded here rather than hidden, since "reproduces" should come with its actual guarantee, not an unqualified one.
 
@@ -344,8 +346,301 @@ The strength block already fed into `wod.strength` (`pre`, `dampen`, the axis pr
 
 `roll()` and `swapOne()` now snapshot `liftRows` and `oneRM` onto the generated candidate (`c.strengthRows`, `c.oneRM`), the same ad hoc pattern this file already used for `c.cue`. The card reads them in a block above the format headline, since chronologically the strength work happened first and it is why the axis bars carry their pre-load markers. `asText()` prepends the same lines, so Copy, Share, and the calendar export all agree with what the card shows.
 
-## The accessory default, and what it is and is not based on
+## The accessory default, now backed by the source log
 
-Checked before writing anything: the 55 sample sessions this app was built from are not in the repository, only what got distilled out of them into `MOVES`, `FORMATS`, and the seven `STRENGTH` presets. And even those presets carry zero accessory rows. `PRESET_ROWS` is main lifts only, for every one of the seven. So there is no session-frequency signal anywhere in this codebase to pre-select accessory work from, not even in aggregate.
+The original dump was supplied after the first implementation and is preserved verbatim in `data/55_sessions.txt`. The filename and product history say 55 sessions, but the file contains 56 timestamped entries. `scripts/analyze-corpus.js` makes that mismatch and every derived count reproducible.
 
-Rather than invent one, the starter default (walking lunges, DB row, both 3x8) is the two movements reported as actual accessory work earlier in this conversation. It is the fallback `loadPref("liftRows", ...)` returns when nothing has been saved yet, so it only ever applies to a first-time visitor and is never applied over a saved choice. Verified: a fresh browser context shows the two rows ticked; a context with its own saved `liftRows` keeps exactly that.
+Only the text before each conditioning marker is counted for accessory defaults. Split-squat, Bulgarian-squat, and walking-lunge work appears in 10 entries; dumbbell rows appear in 6. They are the two most common movements supported by the accessory grid. Their modal written doses are 3x8 and 3x10, so those are now the first-visit defaults. A saved `liftRows` preference still wins and is never overwritten.
+
+---
+
+# Week planner
+
+## One generator, two time horizons
+
+The planner does not own a second workout generator. `planWeek()` calls the same seeded `generate()` function for each day. It adds only the information a sequence needs: a schedule, earlier load carried into the next day, diversity exclusions, and an automatic effort choice.
+
+The source log gives one unusually strong scheduling signal: 23 entries are on Monday and 24 on Wednesday, 47 of 56 in total. That makes a two-day Monday/Wednesday week the honest default. The corresponding broad strength defaults are lower body and pressing, the most common before-conditioning focuses on those days. Three-to-five-day schedules remain available and spread the existing strength shortcuts across weekdays; those extended schedules are product defaults, not corpus frequency claims.
+
+## Carried fatigue is not today's work
+
+A daily session used to have one object called `strength`, which served two jobs because they were identical: it told `faults()` what load the athlete arrived carrying, and it told `sessionLoad()` what work happened today.
+
+They separate in a week. Wednesday's composition must see decayed Monday fatigue plus Wednesday strength, but Wednesday's reported load must not count Monday again. Candidates now keep both:
+
+- `arriving`: today's strength plus earlier fatigue, used by rep scaling and fault checks.
+- `strength`: only today's strength, used by `sessionLoad()` and the card.
+
+`sessionAxisLoad()` turns today's strength and conditioning into a six-axis vector. The next planned day decays the accumulated vector by `0.55 ^ calendarDays`, combines it with that day's strength, and runs the shared `arrivingFromAxis()` conversion. At the normal two-day gap, about 30% remains.
+
+The 0.55 coefficient is deliberately labelled a heuristic. The source log records sessions, not recovery or readiness, so it cannot validate a physiological decay curve.
+
+## Automatic effort and weekly diversity
+
+For `auto`, the planner generates the same seeded shape at soft, normal, and hard, then keeps the result closest to 310 total points. That target sits on the load scale already calibrated around 20 points per hard minute; it is not a new unit. A heavy strength day therefore tends to receive softer conditioning, while a light interval or quality day can move harder.
+
+Adjacent days exclude the previous format and movements. These are preferences, not hard constraints: `poolFor()` falls back to a repeated movement when a small environment cannot fill a required slot otherwise. The planner never returns an incomplete day just to satisfy variety.
+
+One week seed derives one stable seed per day. Editing strength or effort therefore preserves the existing formats and movements and updates reps and downstream carry. Changing environment can replace movements because availability changed. "Another week" is the explicit redraw.
+
+`npm run check:planner` verifies deterministic 2, 3, 4, and 5-day plans, adjacent diversity in the gym pool, nonzero carry-over, load accounting, and a changed result from a changed week seed.
+
+## The schedule became a control
+
+The planner shipped with the weekday as the one fact it read and the one fact you could not set. `editDay` already handled a `weekday` field and nothing ever called it; the cadence came from `SCHEDULES` and stayed there. That is an odd gap for this feature in particular, because the calendar gap is the entire input to carry-over: the same two sessions on Monday and Tuesday and on Monday and Thursday are different weeks, and only one of them was reachable.
+
+The weekday is now a select in the card heading rather than a fourth control in the row below it. The heading already displayed the weekday, so making it the control keeps one place on screen for one fact instead of showing it twice.
+
+Two constraints follow from what the model actually reads:
+
+- **The week re-sorts on every edit.** `planWeek()` walks the configs in order and computes each gap as `(weekday - previous + 7) % 7`. Out of order, a Wednesday following a Friday reads as five days later rather than two days earlier, and the reported carry-over is not the week on screen.
+- **One session per weekday.** With two days on the same weekday the gap expression falls through to `|| 7`, so the second session would arrive as though a full week had passed. Two-a-days are a real thing and this model does not describe them, so the select hides a day already spoken for rather than quietly mispricing it.
+
+## A dropped day used to shift every card after it
+
+`planWeek()` ends in `.filter(Boolean)`, because a day whose config the generator cannot satisfy returns null rather than failing the week. The interface then paired `plan[i]` with `configs[i]`. Those are the same index only while nothing drops.
+
+The reachable cause was a saved preference. `weekConfigs` persists to `localStorage`, so a config written by one build is read back by the next; an `env` that no longer exists reaches `poolFor()`, every pool comes back empty, `buildCandidate` returns null 300 times, and the day disappears. Every later card then rendered one day's workout above another day's controls, and editing those controls wrote to the wrong day.
+
+Fixed at both ends. `planWeek()` records `index` on `wod.plan`, so a card can find the config that produced it whatever its position; and `normaliseWeek()` checks every saved field against the list that owns it, so the stale value never reaches the generator in the first place. The first is the invariant, the second is the cause. `npm run check:planner` covers both, including a deliberately unbuildable day.
+
+This is also why `moves.js` now exports `ENVS`. The three environments were a comment in the header, a literal in `App.jsx`, another in `WeekPlanner.jsx`, and a fourth in `smoke.js`. Validation needs a list that owns the fact.
+
+## One model, two views
+
+The planner and the daily card were two apps sharing a stylesheet. Every fact about a session existed twice: `env` and `intensity` as component state in the daily view and again on each week config, and the strength block as one global `liftRows` grid the week could only borrow wholesale through a `focus` of `"custom"`. The seeds were unrelated too, `seedRef` against `daySeed(weekSeed, i)`. Day one of a week could therefore never be the workout the Day tab was showing, and there was no way to walk through a week tuning each day, which is the thing the planner was for.
+
+This is the same failure the load model had before it was unified: a per-round target in the generator and a session total in the interface, neither aware of the other. The resolution is the same shape. A day is the unit. A week is a list of days. Both views read one `planWeek()` result.
+
+### What a day owns
+
+`{ weekday, env, intensity, rows, locks, swaps, nonce }`. Everything a session needs, and nothing derived.
+
+`rows` replaced `focus` rather than joining it. Storing a preset name and the rows it stands for is two representations of one fact, and they drift the moment a row is edited. The rows are stored; `presetFor(rows)` derives which shortcut they match, or `custom`. One-rep maxes stayed global: a 1RM is a fact about the athlete, not about Wednesday.
+
+`locks` carry `{ moveId, reps }`. `buildCandidate()` deliberately does not rescale a locked item, so the rep count is part of what a lock means; storing the id alone would rescale the movement you locked in order to keep.
+
+`nonce` redraws one day. `daySeed(seed, index, nonce)` moves that day's stream and nothing else, and nonce 0 reproduces the seed a day had before per-day redraws existed, so no saved week moved when this landed.
+
+### Swap had to become an intent
+
+The daily card used to keep its workout in state, so a swap could be applied to it directly. A day is now derived from its config on every render, so an applied swap would vanish on the next keystroke. `config.swaps` stores `{ moveId, nonce }` and `applySwaps()` replays them after the day is generated, pinning `fmt`, `cap` and `rounds` so only the named slot is redrawn. Replaying in order is what makes swapping the same slot twice behave: the second entry names the movement the first one produced.
+
+Writing it down exposed a bug that had always been there. The old swap passed the kept movements as `locked` and let `buildCandidate` fill the empty slot, but `used` only contains the kept movements, so the movement you just rejected was still in the pool and could be drawn straight back. In a small pool it often was, and the button looked broken. `excludeMoves`, which the week planner had introduced for day-to-day variety, is exactly the missing piece: a swap now excludes what it replaces, and the previous day's movements as well, so a swap cannot quietly undo the week's diversity. Checked over 144 swaps in `npm run check:planner`: the format, cap and rounds always survive, every other movement stays, and the rejected movement never comes back.
+
+### A day is addressed by its weekday
+
+Editing a day re-sorts the week, because calendar order is what the carry-over model reads. An index into `configs` therefore points at a different day after almost any edit. `App` keeps `selectedDay` as a weekday, which is unique within a week and survives the sort, and looks the config up by it.
+
+### What this costs
+
+A workout with no week around it no longer exists. Every session belongs to a day, and "Another" redraws that day rather than handing you an anonymous new workout. That is a real loss for someone who only wanted a one-off, and it is the price of the two views agreeing.
+
+Editing one day also changes the days after it. Their reps move because their `arriving` includes the edited day's carry, and their movements can move because they exclude the previous day's. Earlier days never move. This is the diversity and carry-over model doing what it says rather than a leak, and `npm run check:planner` pins the direction: redrawing day two leaves day one untouched.
+
+## A ladder was printing one workout and charging for another
+
+Reported from use: adding `3x8 goblet squats` to a strength block moved the day's load from 310 down to 303, with the conditioning piece looking completely unchanged. Two separate things were stacked underneath it.
+
+**Auto effort is a trade, and that part is working.** `chooseSession()` picks whichever of soft, normal and hard lands the whole day closest to `TARGET_DAY_LOAD`. Strength and conditioning therefore compete for the same budget: about 34 points of accessory work pushed "hard" past the target, auto stepped down to "normal", and the conditioning fell further than the strength rose.
+
+```
+seed 36, ladder, identical movements
+  before:  effort hard    strength 193  conditioning 119  total 312
+  after:   effort normal  strength 224  conditioning  74  total 297
+```
+
+Measured over 1500 seeds with the same two strength rows: on `auto` the load drops in 297 of 1234 same-shape cases; at a fixed effort it drops in 0 of 1239 at soft, 8 of 1219 at normal, 19 of 1210 at hard. Those last few are quantisation, not the target: `row_m` steps 50 m at a time, which is 15.5 points across five passes, so two coarse movements stepping down together can outweigh the strength added. Both behaviours are the model doing what it says.
+
+**The ladder display was not.** `repParts()` printed the format's literal `10-8-6-4-2` for every movement, so the reps the generator had actually scaled were invisible. In the case above they went `10/25/6` to `6/15/4`, a 40% cut, with a byte-identical card. Across 927 generated ladder items the costed reps ranged from 4 to 450 and every one of them printed `10-2`.
+
+The model itself was already coherent. `passes: () => 3` is exact because the scheme sums to 30 against a top rung of 10, so `it.reps` is the top rung and the ladder costs `reps * 3`. Only the printing was wrong. `ladderRungs()` now scales the scheme by `reps / scheme[0]`, so a movement at 11 reps prints `11-9-7-4-2` and one at 450 m prints `450-360-270-180-90`, and the rungs sum to exactly what `sessionLoad()` charges. The headline dropped its global `10-8-6-4-2`, which was never true of more than one movement at a time.
+
+`npm run check:planner` pins the invariant that made this findable: printed rungs sum to `reps * passes`, within the rounding of five integers.
+
+Rounding does leave a tie at small doses (`4-3-2-2-1`). That is honest about a ladder the generator scaled down to almost nothing, where the old display claimed 30 reps and charged for 12, so it is left alone rather than smoothed into a nicer-looking lie.
+
+## The page scrolled sideways on a phone
+
+Found while checking the ladder rungs at 390px, and it turned out to predate them. Three separate causes, each of which widened the document and dragged everything else out with it.
+
+**The title set the page's minimum width.** `.h1` was a fixed 42px, which renders "GENERADOR DE WOD" at 302px. With the language toggle at 71px and the flex gap, the header needed 417px before anything else was considered, so every viewport under about 430px scrolled. The title now scales with `clamp(26px,8.5vw,42px)` and its flex parent may shrink.
+
+**A `1fr` grid track is `minmax(auto,1fr)`.** It refuses to go below the min-content width of its widest item, so a card holding a long ladder dose widened the column, and the sidebar sharing that column stretched with it. The overflow therefore reported itself in the sidebar while the cause was in the card, which is what made it confusing to chase. `minmax(0,1fr)` lets the track shrink and the content wrap.
+
+**The card header could not wrap.** The headline and the nowrap work tag sat on one flex line, so "CHIPPER · CAP 10'" beside "TRABAJO TOTAL · 121" needed 354px at a 320px viewport. It wraps now, and the headline scales.
+
+Measured across 320, 360, 390, 430, 620, 768, 880 and 1280px: 25 workouts in the Day view and every week size from 2 to 5, zero horizontal overflow. Before the fix, 320px overflowed on 6 of 25 workouts and 390px on every one of them.
+
+One layout decision follows from what a ladder is for. When a rung list and a movement name compete for a narrow row, the rungs keep their line and the name wraps: the rungs are the number you train off, and breaking `20-16-12-8-4` across two lines to keep "m de carrera" intact gets the priority backwards.
+
+## The middle of a session is its own block
+
+Reported from use, describing how the sessions actually run: a warm-up, then barbell work, then accessory or supplementary work, then the piece. The app collapsed the middle two into one heading, "strength block before", so a set of walking lunges read as part of the same block as a 3x5 back squat. They are not the same block, and the app already knew it in every place except the card: the sidebar has had separate `Levantamientos` and `Accesorio` headings all along, and `arrivingFromLifts()` has always priced the two kinds of row by different formulas.
+
+`splitRows()` now separates them by row kind, and the day card, the week card and the plain-text export each render them as their own block. Nothing about the load model changed; this is the interface catching up with a distinction the data already made.
+
+One consequence worth having: a strength shortcut names the barbell block only. `presetFor()` reads the lifts alone, so accessory work no longer forces the shortcut to read `custom`, and `withPreset()` swaps the lifts while leaving the supplementary rows in place. Switching Monday from squats to pressing used to delete the accessory work as a side effect.
+
+## Rowing and running as supplementary work
+
+Also reported: a rower or a run is not only a conditioning movement. It sits between the barbell and the piece often enough to belong in the accessory grid, and running in particular is the one piece of supplementary work that needs no equipment, which makes it useful away from a gym.
+
+`row_cal`, `row_m` and `run_m` were already in `MOVES` and reach about 10% of gym sessions each as conditioning movements. Adding them to `ACCESSORY` needed no pricing work: `accessoryPoints()` charges per unit by the movement's own `cost`, so 500 m of rowing is 31 points, 400 m of running is 30, and 30 calories of rowing is 30. All three land near a minute and a half on the scale that puts a hard minute at 20.
+
+What did need work was the grid, which assumed every accessory is counted in reps. The dose ceiling was a flat 60 and a new row was seeded at 3x8, which gives "3x8 m of rowing". `accessoryRepMax()` takes the ceiling from the movement's own prescribed dose, `defaultAccessoryRow()` seeds a distance, calorie or time piece as one set of that dose, and the row shows its unit. This also fixes a plank, which had been defaulting to 3x8 seconds since it was added.
+
+The warm-up stays unlogged, for the reason already recorded above: the calibration was fitted against whole sessions that included their warm-ups, so logging one would count it twice.
+
+## The accessory block arrives already chosen
+
+Splitting accessory work into its own block exposed that the merge had quietly dropped its default. The old daily view seeded `liftRows` from `CORPUS_DEFAULTS.accessory`, but a day's rows now come from `rowsForPreset()`, and `PRESET_ROWS` is main lifts only, for all seven shortcuts. So every fresh day arrived with an empty accessory block. That is a regression the merge introduced, not a decision.
+
+Filling it back in raised a factual question worth being straight about. The request was framed as "every one of the 55 sessions includes the accessory section", and the log does not say that. Counting the text before each conditioning marker, 28 of the 56 entries carry accessory work and 28 carry none; the empty ones are genuinely conditioning-only days, not a parsing failure. Of the 28 that do, 18 carry one movement, 5 carry two and 5 carry three.
+
+So the block the app builds is drawn from the log's shape but not its frequency. `drawAccessory()` weights the block size by 18/5/5 and the movements by how often each appears, and simply excludes the zero case. Always having a block is a product choice, and `CLAUDE.md` and `src/corpus.js` both say so rather than dressing it as a corpus fact.
+
+The doses are the ones written in the log where a line is legible, 3x8 otherwise. An earlier attempt to report modal doses per movement was thrown away: the regex fell back to 3x8 so often that the "mode" was mostly the fallback reading itself back. Only a handful of lines give a dose unambiguously.
+
+Measured over 4000 draws against the log's own 28 accessory blocks: size 65/18/18 percent against 64/18/18, median cost 38 points. The source-side comparison that used to sit here has been withdrawn: it was computed in a script that was never committed, and the parser it relied on was wrong. See the review section below. `npm run check:planner` pins the size range, that every drawn movement is one the log evidences, that the draw reproduces from its seed, and that the median block stays near the log's.
+
+`drawAccessory()` never draws rowing or running, though both are offered in the grid. The log gives no evidence for them as accessory work, and inventing it to fill out a pool would be exactly the kind of fabricated default `CORPUS_DEFAULTS` exists to avoid.
+
+"Another" redraws the accessory block with the conditioning piece; "Another week" redraws every day's. The barbell block is untouched by both, because it is your programme rather than something the app suggests.
+
+## The actions moved to the top of the card
+
+They were below the axis meter, which on a phone put the buttons a full screen of scrolling below the workout. They are the most-used part of the app: "Another" is how you use the generator at all, and Copy is how the session leaves it. The card now opens with them.
+
+## Where you train decides the whole session
+
+Until now `env` gated the conditioning piece and nothing else. The barbell grid offered a back squat at home and a bench press in a park, and a saved gym block came back unchanged when you switched, which made the control read as a filter on one third of the session rather than a statement about where you are.
+
+The gap was in the data. `MOVES` has always carried `env`; `LIFTS` had no such field, so nothing knew a barbell needs a gym. Adding it settles the question in the place that owns it: eleven lifts are gym-only, and `weighted_pullup` is the one exception, needing something to hang from rather than a loaded bar, which a park has. Everything else follows from that one field. `liftsFor()`, `accessoriesFor()` and `presetsFor()` decide what the interface offers, `rowAvailable()` decides what survives being read back out of storage, and `rowsForEnv()` rebuilds a day when you move.
+
+### Asked for, and got
+
+Switching to a park and back has to return the session you left, and the first attempt did not: rebuilding read the block off the rows, so a squat day became a pull-up day in the park and then stayed a pull-up day back at the gym. Reading intent off a result loses the intent.
+
+The app already had the right pattern for this. `config.intensity` can say `auto` while `plan.intensity` records the step auto chose. A day now stores `preset` the same way: what you asked for, kept even where it cannot be done, while `presetFor(rows)` reports what the place actually gave you. A squat day shows pull-ups in the park, nothing at home, and squats again when you get back.
+
+### What a good day is worth depends on where you are
+
+One `TARGET_DAY_LOAD` of 310 for all three environments was both timid at the gym and unreachable at home. Measured over 1500 sessions per case: a gym day with a full barbell block runs to a median of 377 points at normal effort and 427 at hard; a park day with weighted pull-ups to 272 and 318; a session with no loadable movement at all to 177 and 240.
+
+The targets are now 450, 350 and 320, each chosen against those numbers rather than for how they read. What lands, with the default block for each place and automatic effort: gym median 394 with a p90 of 455, park 336, home 314.
+
+### The accessory block does the barbell's work when there is no barbell
+
+Sizing the accessory block per environment was the first attempt and it produced a park day worth 468 points, more than the gym. The budget had assumed a park has no strength block, but a park has weighted pull-ups, and a 5x5 at 80% is 133 points on its own.
+
+`PRE_BUDGET` covers the barbell block and the accessory block together, so the accessories are only asked for what the lifts do not already deliver: a park day keeping weighted pull-ups draws about one accessory movement, one with no barbell draws five. At the gym the budget is `null`, meaning the accessory block keeps the size the source log gives it, because there the barbell is doing the work and the log has real data about it. The park and home figures have no such backing and are labelled a product choice, as every session in the log was a gym session.
+
+What this did not fix at the time: a living room had no pulling movement at all, which is why the `nopull` warning was nearly universal there. That was a gap in `MOVES`, and the section below closes it.
+
+## Dumbbells live at home
+
+Reported, once the environments were separated and the gap was visible: there are light-medium dumbbells at home, so anything a light-medium dumbbell can do belongs there.
+
+The line has to be drawn somewhere and it is a judgement about one person's kit rather than anything derivable, so it is written down as a rule: a movement moves home if its prescription starts at 15 kg or less per hand for a pair, or 20 kg or less for a single. That takes `devil_press`, `thruster`, `clean_jerk`, `db_push_press`, `db_push_press_uni`, `db_row` and `renegade_row`. It leaves `db_snatch` at 22.5 and `hang_clean` at 2x17.5-20 just outside, and leaves everything needing kit that is not a dumbbell where it was: kettlebell swings and snatches, slam balls, wall balls, the sandbag work, and the 32 kg goblet squat.
+
+None of them reach a park. Nobody carries dumbbells to a park, which is the whole reason the environments differ, so home now offers more accessory movements than a park does. That reads as an inversion and is correct.
+
+The effect on the sweep, which is why `out/smoke-report.md` moves in this commit rather than staying identical:
+
+- **`nopull` fell from 31.2% of all sessions to 15.3%**, and at home specifically from 93.5% to 45.8%, counted over the sweep's 2800 home workouts. Home went from no pulling movement at all to carrying one in 40.6% of sessions. The warning finally carries information there: it now tells you this particular session skipped pulling, which is something a swap can fix, rather than restating that the movement pool has a hole in it.
+- **The `traccion` axis share rose from 0.096 to 0.133** across all environments, since seven movements went from one pool to three.
+- **A home session went from a mean of 276 points to 287.** Hard faults stayed at zero.
+
+`npm run check:planner` pins both lists by name. The rule cannot be recovered from the `kg` string at run time, and a future data edit that quietly sends a 32 kg kettlebell home should fail rather than pass silently.
+
+## What an outside review found
+
+The branch was reviewed by the agent that wrote the week planner, given the commit range and the repo's own checks. Eight findings, all of which reproduced. They are recorded here because several were self-inflicted by the day-and-week merge and the pattern is worth not repeating.
+
+**Ticking a lock redrew the whole session.** The worst of them, and the one the review understated: it saw the behaviour once in a browser, and measured over 600 seeds it happens in 599. A day is derived from its config on every render, so putting `locks` into that config fed them straight into `generate()`. Locked items change a candidate's axis vector, that changes which candidates `faults()` rejects, and a different rejection count leaves the accepted candidate at a different point in the seeded stream. The button that exists to keep one movement was reliably replacing all of them.
+
+`config.locks` is now what you have ticked and `config.held` is what the current draw honours; "Another" promotes one into the other. That restores exactly what the daily card did before the merge, where a lock was an inert flag until you rerolled. Ticking now changes nothing: 0 of 600 seeds.
+
+The underlying drift is still there. Editing a lift by one rep changes the format or the movements in about 16% of seeds, for the same reason. `CLAUDE.md` used to call this "essentially never bites" on the grounds that the sweep finds zero hard faults in returned workouts, and that inference is simply wrong: zero faults in the *accepted* candidate says nothing about how many were rejected first. The deeper fix is to derive the session's shape from the seed alone and let load and effort scale only the reps, which would make the guarantee real. It was weighed and set aside, because the composition checks that reject candidates depend on the arriving load and turning them into warnings trades a rare invisible reshuffle for a common visible one.
+
+**An emptied strength block came back full.** Storing the requested preset alongside the rows looked like the `intensity`/`plan.intensity` pattern, but it is not the same thing: effort resolves to a step every time, whereas rows are authored. Rebuilding from the remembered preset discarded hand edits, and if you had cleared the block it rebuilt it from scratch. Rows are now kept per environment in `config.byEnv`, set aside when you leave a place and restored when you return, so a `5x7` survives a trip and a cleared block stays cleared.
+
+**Growing the week destroyed it.** `changeCount()` replaced every config with defaults, so asking for a third session threw away a hand-edited Monday. This one predates the merge, but the merge made it far more expensive by moving rows, locks and swaps onto the day.
+
+**`Infinity` is a positive number.** A stored lock of `1e309` passed `reps > 0`, produced a day total of `Infinity` and a next-day total of `NaN`, and the fault count still read zero. Everything saved now goes through a bounds check. In the same family: a saved block containing only unknown movements cleaned to an empty array, and an empty array is truthy, so it won the `|| fallback` chain and silently emptied the day. That is the same bug that had already been found and fixed once for the `focus` migration and not generalised.
+
+**Two redraw paths bypassed the budget.** `rowsForDay()` subtracts what the lifts deliver before drawing accessories; "Another" and "Another week" called `drawAccessory()` directly and did not, taking a park day's pre-conditioning work from 155 points to 269. There is now one function, `accessoryBudget()`, and both paths go through `redrawRows()`.
+
+**Smaller ones.** "Another week" left stale swap intents behind, which could fire dormant on a later week that happened to contain the old movement. Copy feedback and a hand-picked calendar date belonged to the whole app rather than to the day they were set on.
+
+**Two published numbers did not reproduce.** Home `nopull` was given as 93.7% to 56.2%; the sweep says 93.5% to 45.8%. The first figure came from an ad-hoc sample of one strength block, using a seed and a sample size that were never committed. The corpus block-cost median of 43 has been withdrawn entirely for the same reason, compounded by the parser fault described below. A number that cannot be regenerated from the repository should not be stated in it as fact.
+
+## The corpus, read properly
+
+The review's third finding was that the parser counted the movements inside an unlabelled conditioning piece as accessory work. It reproduced, and it was worse than a miscount: the accessory table the app drew from was largely fiction.
+
+The parser split each entry on the first marker word (`WOD`, `AMRAP`, `EMOM`, `FOR TIME`, `FINAL`) and treated everything before it as pre-conditioning work. Thirteen of the 56 entries never write one. `[11/4] 3 rondas / 200 m remo / 12 DB thrusters / 12 sit-ups / 10 box step-ups / 30" plancha frontal` is a conditioning piece, and the parser read it as a five-movement accessory block.
+
+The verification that missed this is worth naming. When the counts were first published, the 28 entries with *no* detected accessory work were checked by eye and found to be genuinely conditioning-only. The 28 *with* it were not checked. One direction of a two-directional claim was verified and the result reported as though both had been.
+
+### What the log actually says
+
+`data/annotations.json` now records, by hand and keyed by the log's own timestamps, which rows of each entry are barbell work, which are accessory work, and whether there is a piece at all. `analyze-corpus.js` reads it and refuses to run if it disagrees with the log on count, order or timestamps. The log stays verbatim; it is the thing the annotation is checked against, which is the whole reason for keeping it.
+
+Of 56 entries: 54 contain a conditioning piece, 17 contain barbell work, 28 contain an accessory block. Coincidentally the same 28 as before, and almost entirely different entries.
+
+Block sizes are `{0: 28, 1: 10, 2: 12, 3: 4, 4: 2}`, not the `{0: 28, 1: 18, 2: 5, 3: 5}` published earlier. Two movements is the most common accessory block, not one.
+
+The movement table changed completely:
+
+| | claimed | actual |
+|---|---:|---:|
+| walking lunges | 10 | **0** |
+| box step-ups | 4 | **0** |
+| dumbbell press | not listed | 8 |
+| split squat | folded into walking lunges | 7 |
+| back extension | not listed | 7 |
+| pull-ups | not listed | 5 |
+| farmer carry | not listed | 4 |
+| dumbbell row | 6 | 6 |
+
+Walking lunges and box step-ups, the two movements the accessory defaults were built on, do not appear in a single real accessory block. They are common inside conditioning pieces, which is exactly what the parser was reading.
+
+### What the app can and cannot offer
+
+Naming movements honestly rather than mapping them onto the nearest match exposes a gap that the old table hid. The three most common accessory movements in the log are a dumbbell press, a split squat and a back extension, and the app has a movement for none of them. `CORPUS_DEFAULTS.unrepresentedAccessory` lists all eight, so the gap is visible rather than papered over by calling a Bulgarian split squat a walking lunge, which loses the per-side dose and prices it at half.
+
+Four movements the log evidences were already in `MOVES` and merely not offered as accessory work: pull-ups, farmer carries, renegade rows and side planks. Offering them costs nothing, changes no generated workout, and takes the drawable pool from five movements to nine.
+
+### Sizing the draw
+
+The gym block now takes both its size and its ceiling from the log: the size distribution above, and a cost cap of about 160 points, the heaviest block the log contains. Without the cap a draw of three expensive movements reached 289 points and outweighed the piece it preceded. A movement that would breach the ceiling is passed over rather than ending the draw, so one heavy choice cannot land beyond it.
+
+Away from a barbell the budget governs instead, and the evidenced pool cannot always fill it, so whatever else the place allows completes the block at a low weight. That filler is not corpus support and is not described as any.
+
+Measured over 3000 draws, the gym block matches the log at 36/44/16/5 percent against 36/43/14/7, tops out at exactly 160 points, and takes 87% of its movements from the evidenced pool.
+
+## Second review round
+
+Six more, all reproduced. The pattern across both rounds is that the fixes were correct and the *edges* of the fixes were not.
+
+**Clearing the calendar time unmounted the app.** The worst of the round and nothing to do with the model. `new Date("2026-08-31T:00")` is an Invalid Date and `toISOString()` on it throws, and that ran inside a `useMemo` during render, so the whole app came down while you were retyping a time. Both calendar links now come from one `when` memo that returns null unless the pair parses. This is the third transient-state problem in two rounds, after `copied` and `dateOverride`; the first two were about a value outliving its day, this one about a value being briefly meaningless.
+
+**One-rep maxes were the saved thing nobody bounded.** The previous round put every number on a day through `bounded()`, but `oneRM` is persisted separately and reaches `rowsForPreset()` directly, so a stored `1e309` put `Infinity` on every barbell row and a stored `null` threw before the first render. `CLAUDE.md` had been updated to claim every saved number passed through the check, which made the gap harder to see rather than easier. `normaliseOneRM()` closes it.
+
+**Resizing still lost a week that did not start on Monday.** Shrinking kept the earliest days, which is only the same as "the days you set up" when the app's filler lands later in the week. A Friday and Saturday week grown to four days and shrunk back kept the two weekdays the app had inserted and threw both of yours away. Days the app adds now carry `auto`, any edit clears it, and shrinking removes marked days first.
+
+**A budget that is only a loop condition is not a ceiling.** Away from a barbell the draw checked the remaining budget before starting an iteration but let the chosen movement overshoot without limit, and it always took a first movement even when nothing fitted. A park day with weighted pull-ups came out at 181 points against a budget of 150. The ceiling now applies to every pick including the first, which means an empty accessory block when the lifts have spent the budget: that is the honest answer rather than a floor to enforce. The park and home budgets were re-tuned to 200 and 130 so there is room for a block alongside the lifts, and sessions still land at 415, 340 and 308 against targets of 450, 350 and 320.
+
+**A snapshot that validation emptied read as a deliberately emptied one.** `byEnv` stores what you authored per place. A saved park snapshot containing only a bench press correctly loses the bench, but the empty array that remained was truthy and `changeEnv` took it for an authored empty block, leaving the park day with nothing at all. Same shape as the `cleanRows` bug from the first round, one level up. A snapshot that nothing survives is now discarded so the place is built fresh.
+
+**Swapping a locked movement left a lock nothing could reach.** The movement left the card while `locks` and `held` went on naming it, so it could not be unticked and came back on the next redraw. Swapping now drops the lock with the movement.
+
+### On the annotation
+
+The review checked all 56 entries against the log and found no missed movements, which is the result worth having. It raised four classifications the log does not settle: a bare "Remo 3x10" read as a barbell row from the previous session's wording, an RDL inside a block the athlete labelled "Accesorios", a superset of weighted planks and V-ups that could be the piece rather than accessory work, and a "dominadas lastradas (o estrictas)" that does not say which was done. Each now carries `certainty: "judgement"` and a note saying what the alternative reading would do to the counts, and `npm run corpus` lists them. Two of the four would change a published number.
+
+### Numbers, again
+
+The evidenced share of a gym block is 87%, not the 88% published. The session-load medians moved with the budget re-tune and are now 415, 340 and 308. The review also made the fair point that the committed check asserts only a 120-point band, so it does not pin those figures; they are measurements quoted in prose, and the check is a guard against drift rather than a proof of them.
