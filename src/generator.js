@@ -42,17 +42,20 @@ export function axisVector(items) {
   return v;
 }
 
-export function volumeBand(fmt, cap, rounds) {
-  switch (fmt.id) {
-    case "amrap":     return [cap * 3.0, cap * 5.2];      // cost of one round
-    case "fortime":   return [130 / rounds, 250 / rounds];
-    case "emom":      return [11, 19];                     // cost of one minute
-    case "intervals": return [9, 18];
-    case "ladder":    return [110 / 5, 220 / 5];           // cost of the "10" rung ≈ 1 unit
-    case "chipper":   return [110, 200];
-    case "quality":   return [70, 130];
-    default:          return [20, 60];
-  }
+/* What one round should cost. The inverse of sessionLoad below: that one
+   multiplies a finished round back up to a session, this one divides a target
+   session down to a round. `intensity` is the hook the soft/normal/hard control
+   will hang off; at 1 it changes nothing. */
+export function roundTarget(fmt, p, dampen, intensity = 1) {
+  return (fmt.load(p) / fmt.passes(p)) * intensity * dampen;
+}
+
+/* What a finished candidate actually costs, split so the interface can show
+   the parts and a week planner can compare one day against another. */
+export function sessionLoad(c) {
+  const conditioning = c.totalWork * c.fmt.passes(c);
+  const strength = Object.values(c.strength.pre).reduce((s, v) => s + v, 0) * 0.9;
+  return { conditioning, strength, total: conditioning + strength };
 }
 
 export function baseReps(m, scale) {
@@ -107,8 +110,7 @@ export function buildCandidate(env, strengthId, locked, fixed) {
   if (items.length < 2) return null;
 
   // Scale volume analytically into the band for this format.
-  const [lo, hi] = volumeBand(fmt, cap, rounds);
-  const target = (lo + hi) / 2 * st.dampen;
+  const target = roundTarget(fmt, { cap, rounds }, st.dampen);
   const current = items.reduce((s, it) => s + itemCost(it), 0);
   if (current > 0) {
     const k = clamp(target / current, 0.55, 1.9);

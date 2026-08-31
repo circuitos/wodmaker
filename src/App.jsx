@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { AXES } from "./moves.js";
 import { CUES, STRENGTH } from "./formats.js";
 import { T } from "./i18n.js";
-import { generate, pick } from "./generator.js";
+import { generate, pick, sessionLoad } from "./generator.js";
 import { asText, headline } from "./text.js";
 import { platesFor } from "./plates.js";
 
@@ -180,11 +180,7 @@ export default function App() {
     return wod ? Object.fromEntries(AXES.map((a) => [a, wod.vec[a] / sum])) : {};
   }, [wod]);
 
-  const dayWork = useMemo(() => {
-    if (!wod) return 0;
-    const pre = Object.values(wod.strength.pre).reduce((s, v) => s + v, 0);
-    return Math.round(wod.totalWork * (wod.fmt.id === "amrap" ? 5 : wod.fmt.id === "fortime" ? wod.rounds : wod.fmt.id === "emom" ? wod.cap / wod.items.length * (wod.items.length === 3 ? 3 : wod.items.length) : wod.fmt.id === "intervals" ? wod.rounds : wod.fmt.id === "ladder" ? 3 : 1) + pre * 0.9);
-  }, [wod]);
+  const dayWork = useMemo(() => (wod ? Math.round(sessionLoad(wod).total) : 0), [wod]);
 
   const doCopy = async () => {
     try { await navigator.clipboard.writeText(text); }

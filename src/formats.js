@@ -1,13 +1,26 @@
 /* =========================== FORMATS =========================== */
 
+/* Two volume facts per format, and only these two.
+   `load`   how many work points the whole conditioning piece should be.
+   `passes` how many times you go through the movement list to get there.
+   The round target is load / passes, and the finished session's cost is
+   totalWork * passes. One number to change, and both move together. See
+   docs/DESIGN.md. */
 export const FORMATS = [
-  { id: "amrap",     w: 22, caps: [8, 10, 12],        slots: [3, 4, 5], scale: 1.0 },
-  { id: "fortime",   w: 28, rounds: [3, 4, 5],        slots: [4, 5, 6], scale: 1.0 },
-  { id: "emom",      w: 20, caps: [8, 10, 12],        slots: [2, 3, 4], scale: 0.9 },
-  { id: "intervals", w: 10, rounds: [5, 6],           slots: [1, 2],    scale: 0.55 },
-  { id: "ladder",    w: 8,  scheme: [10, 8, 6, 4, 2], slots: [3],       scale: 1.0 },
-  { id: "chipper",   w: 7,  caps: [10, 12],           slots: [4, 5],    scale: 2.1 },
-  { id: "quality",   w: 5,  caps: [10, 12],           slots: [3, 4],    scale: 0.8 },
+  { id: "amrap",     w: 22, caps: [8, 10, 12],        slots: [3, 4, 5], scale: 1.0,
+    load: (p) => p.cap * 20.5,  passes: () => 5 },
+  { id: "fortime",   w: 28, rounds: [3, 4, 5],        slots: [4, 5, 6], scale: 1.0,
+    load: () => 190,            passes: (p) => p.rounds },
+  { id: "emom",      w: 20, caps: [8, 10, 12],        slots: [2, 3, 4], scale: 0.9,
+    load: (p) => p.cap * 15,    passes: (p) => p.cap },
+  { id: "intervals", w: 10, rounds: [5, 6],           slots: [1, 2],    scale: 0.55,
+    load: (p) => p.rounds * 13.5, passes: (p) => p.rounds },
+  { id: "ladder",    w: 8,  scheme: [10, 8, 6, 4, 2], slots: [3],       scale: 1.0,
+    load: () => 99,             passes: () => 3 },
+  { id: "chipper",   w: 7,  caps: [10, 12],           slots: [4, 5],    scale: 2.1,
+    load: () => 155,            passes: () => 1 },
+  { id: "quality",   w: 5,  caps: [10, 12],           slots: [3, 4],    scale: 0.8,
+    load: () => 100,            passes: () => 1 },
 ];
 
 /* The strength block that came before. Pre-loads the axes and damps volume. */

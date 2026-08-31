@@ -35,7 +35,7 @@ A new feature lands as part of the app, not beside it. Before writing code, work
 
 Run this check before implementing:
 
-1. **Does the app already half-model this?** Extend what is there instead of standing up a parallel version. Two representations of one idea is the failure mode, and there is already an example: `volumeBand()` sets a per-round volume target in `generator.js`, `dayWork` re-derives a session total in `App.jsx`, and neither knows the other exists.
+1. **Does the app already half-model this?** Extend what is there instead of standing up a parallel version. Two representations of one idea is the failure mode. This codebase had one: a per-round volume target in `generator.js` and a session total re-derived in `App.jsx`, neither aware of the other. It took a file split and a regression harness to unpick safely, which is the cost of leaving it.
 2. **What does it make redundant?** A new capability often replaces an older decision that only made sense in its absence. Retire the old thing in the same change. Keeping both is how the interface silts up.
 3. **Where does it live on screen?** Every control competes for one screen and one reader's attention. If a new control has no natural home, the layout wants rethinking rather than another row of buttons.
 4. **Does it need groundwork that doesn't exist yet?** Extracting a module, reworking the form flow, or changing the shape of a `MOVES` entry are all legitimate prerequisites. Land them as their own commit first, then add the feature onto a structure that fits it.
@@ -70,6 +70,7 @@ node scripts/build-preview-site.mjs /tmp/site   # read-only: compose the full Pa
 ## Gotchas
 - **`load` shares are what the fault checker reads.** Every `MOVES` entry carries a `load` map over the six axes that should sum to about 1. If it sums to something else, that movement quietly gets more or less weight than intended in `faults()`, and no error is raised. Check the axis bars in the UI after adding a movement.
 - **`cost` is calibrated, not arbitrary.** One hard minute of work is about 20 units. A new movement priced by feel rather than against that scale will distort every volume band it lands in.
+- **`load` and `passes` on a `FORMATS` entry are one fact, not two knobs.** `load` is the whole conditioning piece in points; `passes` is how many times you go through the movement list. The generator divides them to get a round target and `sessionLoad()` multiplies back. Changing `load` moves what gets built and what the interface reports, together. Run `npm run smoke` and diff the report.
 - **`env` gates availability.** A movement missing `casa` is unreachable at home, and a home session that ends up with almost no pulling raises the soft `nopull` warning instead of failing. Adding home-friendly pulling means adding a movement, not tuning the scorer.
 - **`generate()` degrades rather than fails.** It tries 300 candidates and returns the least-faulty one if none is clean, so a bad data edit shows up as workouts that always carry warnings, not as an exception.
 - **UI copy lives in `T`, keyed by language.** Both `es` and `en` have to be updated together; a missing key renders as `undefined` in the interface.

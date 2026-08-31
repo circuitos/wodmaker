@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { AXES } from "../src/moves.js";
 import { FORMATS, STRENGTH } from "../src/formats.js";
-import { generate } from "../src/generator.js";
+import { generate, sessionLoad } from "../src/generator.js";
 
 const SAMPLES = Number(process.env.SAMPLES || 400);
 const SEED = Number(process.env.SEED || 1);
@@ -36,29 +36,7 @@ function mulberry32(a) {
 }
 Math.random = mulberry32(SEED);
 
-// Same per-format multiplier dayWork applies in App.jsx. Duplicated here on
-// purpose: the point of the refactor is that this knowledge lives in one
-// place, and until it does, the harness has to carry its own copy to measure
-// what the app currently shows.
-function passes(c) {
-  switch (c.fmt.id) {
-    case "amrap": return 5;
-    case "fortime": return c.rounds;
-    case "emom": return c.cap;
-    case "intervals": return c.rounds;
-    case "ladder": return 3;
-    default: return 1;
-  }
-}
-
-function conditioning(c) {
-  return c.totalWork * passes(c);
-}
-
-function sessionLoad(c) {
-  const pre = Object.values(c.strength.pre).reduce((s, v) => s + v, 0);
-  return Math.round(conditioning(c) + pre * 0.9);
-}
+const conditioning = (c) => sessionLoad(c).conditioning;
 
 const stat = () => ({ n: 0, sum: 0, min: Infinity, max: -Infinity, vals: [] });
 const push = (s, v) => { s.n++; s.sum += v; s.min = Math.min(s.min, v); s.max = Math.max(s.max, v); s.vals.push(v); };
@@ -86,7 +64,7 @@ for (const env of ENVS) {
       total++;
       if (!c) { nulls++; continue; }
 
-      const load = sessionLoad(c);
+      const load = Math.round(sessionLoad(c).total);
       const f = c.faults || [];
       const hard = f.filter((x) => x.hard).length;
       if (hard > 0) faultyCount++;

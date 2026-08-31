@@ -109,7 +109,7 @@ sessionLoad(c) = { conditioning: c.totalWork * c.fmt.passes(c),
 
 Same two numbers, used twice. Change `load` and the target and the display move together, because there is only one number to change. `App.jsx` stops knowing what a format is.
 
-`intensity` is a multiplier that sits at 1 and does nothing. It is there so the control has somewhere to plug in later.
+`intensity` is a multiplier that sits at 1 and does nothing. It is there so the control has somewhere to plug in later, and it is now a real parameter of `roundTarget`.
 
 ## How hard, and who says so
 
@@ -139,13 +139,13 @@ Four commits. Two of them exist only so we can tell whether the third one broke 
 
 The "one file, five numbered sections" map in `CLAUDE.md` and `README.md` died with it, and both were rewritten in the same commit.
 
-**2. Add `scripts/smoke.js`.** Generate a few thousand workouts covering every combination of settings and write down what came out: average and spread of session points per format, how the axis shares fall, how often each warning fires. Add `npm run smoke`, run it, commit the numbers.
+**2. Add `scripts/smoke.js`. Done.** 8400 workouts across every environment and strength block, with `Math.random` replaced by a seeded PRNG so the report is reproducible. Baseline committed as `out/smoke-report.md`. Findings above.
 
-This has to come before step 3. There are no tests here and the output is random, so if we change the model and the workouts still look plausible, that tells us nothing. We need the numbers from before.
+**3. Unify the model. Done.** `FORMATS` entries carry `load` and `passes`. `roundTarget` replaced `volumeBand`, `sessionLoad` is new, `dayWork` is a call to it, and the five-ternary chain and the EMOM no-op are gone. Each format's `load` is its old band midpoint times its old pass count, so the round target is arithmetically the same number.
 
-**3. Unify the model.** Add `passes` and `load` to `FORMATS`, replace `volumeBand` with `roundTarget`, add `sessionLoad`, cut `dayWork` down to a call. Delete the ternary chain and the EMOM line that does nothing. Choose each format's `load` so the numbers come out exactly where they are today.
+The smoke report came back byte-identical over 8400 workouts, and the number shown on screen was unchanged in every one of them.
 
-It is done when the smoke numbers have not moved.
+Two float details, checked rather than assumed. `fortime` at 3 rounds now computes `190 / 3` where it used to compute `(130 / 3 + 250 / 3) / 2`, which differ by one unit in the last place; it changed no output. And the old EMOM multiplier `cap / items.length * (items.length === 3 ? 3 : items.length)` was not exactly `cap` in floating point, so replacing it with `cap` is a correction as well as a simplification; it also changed no displayed number.
 
 **4. Add the control.** Three chips wired to one multiplier. Small, now that there is somewhere to put it.
 
