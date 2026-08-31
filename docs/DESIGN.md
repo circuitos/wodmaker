@@ -263,3 +263,33 @@ Across the sweep the behaviour change is small: session load moved at most 2.5% 
 1. ~~**A fixed list of lifts, or editable?**~~ A fixed dozen (back squat, front squat, deadlift, RDL, bench, overhead press, weighted pull-up, barbell row, hip thrust, lunge) covers most training and keeps the grid scannable. Editable means storing user-defined lifts and asking the user for axis shares, which is not a thing anyone wants to fill in.
 2. ~~**Keep the presets as shortcuts, or drop them?**~~ Kept.
 3. ~~**What is the weighted sit-up?**~~ A barbell back squat.
+
+## The strength block holds two kinds of work, and the app modelled one
+
+Found by scoring a real session rather than by reading the code.
+
+A session was: back squat 5x4 at 95 kg off a 130 max, bench 5x4 at 75 off 87.5, then split squat 3x8 per side with 2x15 kg dumbbells, then single-arm dumbbell row 3x8 with 22.5 kg, then a 9 minute AMRAP.
+
+The model scored it at 688 points, and the split squat alone came to 240, more than the squat and bench together. That is plainly wrong, and the reason is a category error rather than a bad coefficient.
+
+**The two kinds:**
+
+**Main lifts.** Heavy barbell work, done near a known limit, and the natural way to describe them is a percentage of a one-rep max. `LIFTS` prices these correctly: the squat scored 97 and the bench 114, both right.
+
+**Accessory and supplementary work.** Dumbbells, moderate load, higher reps, deliberately short of limits. Nobody tracks a split-squat one-rep max, so a percentage of it is not a thing that can be entered. Asked for one anyway, the model fell back to 75%, which prices a light accessory rep as a heavy working rep and inflated the two accessories from about 98 points to 360.
+
+**The fix needs no new formula, because the app already prices this work.** `MOVES` contains these movements, at these weights: `db_row` is specced at 20 to 24 kg against the 22.5 used, and `db_push_press` at 2x15 kg against the 15 per arm used. Accessory work priced per rep by its `cost`, which is what the conditioning half has always done, gives 41 and 58 points for the two lifts.
+
+So a strength-block row should be able to name either a `LIFTS` entry, priced by percentage of a max, or a `MOVES` entry, priced per rep. One grid, two sources, and the second source already exists with the right numbers in it.
+
+**Corrected, the day is 452 points, about 23 hard minutes:** 212 of main lifts, 98 of accessory work, 173 of AMRAP.
+
+**And `dampen` was not broken after all.** It floored at 0.55 only because it was fed 572 inflated points. On the corrected 310 it lands at 0.72, meaning the next conditioning piece gets built at 72% of normal volume. That matches how the session was described: the hard work is the lifting, and what follows is not near limits. The saturation was a symptom of the inflated input, not a fault in the fit.
+
+**Also worth noting the conditioning half validated well.** The 9 minute AMRAP scored 173 points, which is 8.7 hard minutes. The per-movement costs and the 20-points-per-minute calibration are doing their job.
+
+### Still open
+
+- Which `MOVES` entries to expose as accessory rows. The grid cannot list all 53.
+- Whether the grid shows one list or two labelled groups.
+- Several of these movements carry a `kg` note (`db_row` says 20 to 24 kg) that is documentation rather than data. If accessory rows are to scale with the weight actually used, that note has to become a number.
