@@ -1,4 +1,6 @@
 /* =========================== STRENGTH LIFTS =========================== */
+import { MOVES } from "./moves.js";
+
 /*
   The barbell work that comes before the conditioning piece.
 
@@ -63,6 +65,54 @@ export function liftPoints({ liftId, sets, reps, pct }) {
   return sets * reps * REP_AT_75 * intensity * lift.toll;
 }
 
+/* ---------------------------- ACCESSORY WORK ----------------------------
+ *
+ * The second half of a strength block, and a different animal. Dumbbells at a
+ * moderate load, higher reps, deliberately short of limits. Nobody tracks a
+ * split-squat one-rep max, so a percentage of one cannot be entered, and the
+ * formula above prices these reps as heavy working reps if you let it: a
+ * 3x8-per-side split squat came out at 240 points, more than a 5x4 squat and a
+ * 5x4 bench together.
+ *
+ * These need no new maths, because the conditioning half already prices them.
+ * Every entry here is a MOVES id, charged per rep by its own `cost`, which is
+ * exactly what happens when the same movement turns up inside a workout.
+ *
+ * refKg is the load that movement's cost already assumes. A row's own weight
+ * scales against it, clamped, so a heavier dumbbell counts for more without a
+ * typo being able to blow the number up. Where MOVES gives a range the middle
+ * is taken; where the movement is bodyweight, refKg is a typical loaded value.
+ */
+export const ACCESSORY = [
+  { moveId: "walking_lunge", refKg: 20 },
+  { moveId: "step_up", refKg: 20 },
+  { moveId: "goblet_squat", refKg: 32 },
+  { moveId: "air_squat", refKg: 0 },
+  { moveId: "glute_bridge", refKg: 0 },
+  { moveId: "db_row", refKg: 22 },
+  { moveId: "ring_row", refKg: 0 },
+  { moveId: "db_push_press", refKg: 30 },
+  { moveId: "push_up", refKg: 0 },
+  { moveId: "sit_up", refKg: 0 },
+  { moveId: "v_up", refKg: 0 },
+  { moveId: "plank", refKg: 0 },
+];
+
+export const accessoryById = (id) => ACCESSORY.find((a) => a.moveId === id);
+export const moveById = (id) => MOVES.find((m) => m.id === id);
+
+/* Points for one accessory row. `reps` is per set, and per side where the
+   movement is unilateral, matching how it would be written on a whiteboard. */
+export function accessoryPoints({ moveId, sets, reps, kg }) {
+  const acc = accessoryById(moveId);
+  const move = moveById(moveId);
+  if (!acc || !move || !sets || !reps) return 0;
+  const loadFactor = acc.refKg > 0 && kg > 0
+    ? Math.min(2.5, Math.max(0.4, kg / acc.refKg))
+    : 1;
+  return sets * reps * move.cost * (move.side ? 2 : 1) * loadFactor;
+}
+
 /* Turn the whole grid into the axis load you arrive carrying.
  *
  * `dampen` is derived rather than authored, and it has to be: there is no way
@@ -81,11 +131,13 @@ export function arrivingFromLifts(rows) {
   let points = 0, legPoints = 0;
 
   for (const row of rows) {
-    const lift = liftById(row.liftId);
-    const p = liftPoints(row);
-    if (!lift || p <= 0) continue;
+    // A row is either a main lift, priced against a one-rep max, or accessory
+    // work, priced per rep. Both end up as points spread over the same axes.
+    const source = row.moveId ? moveById(row.moveId) : liftById(row.liftId);
+    const p = row.moveId ? accessoryPoints(row) : liftPoints(row);
+    if (!source || p <= 0) continue;
     points += p;
-    for (const [axis, share] of Object.entries(lift.load)) {
+    for (const [axis, share] of Object.entries(source.load)) {
       pre[axis] = (pre[axis] || 0) + p * share;
       if (LEG_AXES.includes(axis)) legPoints += p * share;
     }
@@ -124,3 +176,19 @@ export const PRESET_ROWS = {
 export function arrivingFromPreset(id) {
   return arrivingFromLifts(PRESET_ROWS[id] || []);
 }
+
+/* Warm-up ramps are not logged, and should not be.
+ *
+ * A ramp to a working weight (6 at 20, 4 at 40, 4 at 60 before 5x4 at 75) comes
+ * to about 40 points under liftPoints, which would be 35% on top of the working
+ * sets. Two reasons not to count it.
+ *
+ * The formula scales effort linearly with percentage of a max, and that only
+ * holds over the working range. It prices a 23% rep at 30% of an 86% rep, when
+ * a set of six at 23% is genuinely free. Below roughly 60% the linear term is
+ * not trustworthy, which is exactly where every warm-up set lives.
+ *
+ * More decisively, the calibration already contains them. The old presets
+ * described whole sessions: `press` was worth 115 points as a bench day, ramp
+ * included. Logging the ramp separately would count it twice.
+ */

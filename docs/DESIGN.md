@@ -288,8 +288,22 @@ So a strength-block row should be able to name either a `LIFTS` entry, priced by
 
 **Also worth noting the conditioning half validated well.** The 9 minute AMRAP scored 173 points, which is 8.7 hard minutes. The per-movement costs and the 20-points-per-minute calibration are doing their job.
 
-### Still open
+### Built
 
-- Which `MOVES` entries to expose as accessory rows. The grid cannot list all 53.
-- Whether the grid shows one list or two labelled groups.
-- Several of these movements carry a `kg` note (`db_row` says 20 to 24 kg) that is documentation rather than data. If accessory rows are to scale with the weight actually used, that note has to become a number.
+Two labelled groups, main lifts and accessory. Twelve accessory entries, each naming a `MOVES` id: walking lunges, step ups, goblet squats, air squats, glute bridge, DB row, ring rows, DB push press, push-ups, sit-ups, V-ups, front plank.
+
+The two groups ask for different things, which is why they are separated rather than sorted. A main lift wants a working weight and a one-rep max, and shows the percentage. An accessory row wants sets, reps and a weight, marks itself per-side where the movement is unilateral, and never asks for a max.
+
+Accessory weight scales the movement's `cost` against a `refKg`, the load that cost already assumes, clamped to between 0.4x and 2.5x so a mistyped number cannot blow the total up. Where `MOVES` gave a range the middle was taken, and where the movement is bodyweight `refKg` is 0 and the weight field is hidden.
+
+The real session now scores **301 points of strength** (squat 97, bench 114, split squat 51, DB row 39), dampen 0.74, which puts the day at **444** rather than the 688 first reported. The smoke report did not move, because the shortcuts use main lifts only.
+
+### Warm-up ramps are not logged
+
+A ramp of 6 at 20 kg, 4 at 40 and 4 at 60 before 5x4 at 75 comes to about 40 points under `liftPoints`, which would be 35% on top of the working sets. Two reasons not to count it.
+
+The formula scales effort linearly with percentage of a max, and that only holds over the working range. It prices a 23% rep at 30% of an 86% rep, when a set of six at 23% is genuinely free. Below roughly 60% the linear term is not trustworthy, and that is exactly where warm-up sets live.
+
+More decisively, the calibration already contains them. The old presets described whole sessions: `press` was worth 115 points as a bench day, ramp included. Logging the ramp separately would count it twice.
+
+The instinct that warm-ups are universal is the reason to leave them out. Something everybody does adds no information; it just shifts the scale.

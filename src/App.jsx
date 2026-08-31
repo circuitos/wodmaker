@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { AXES } from "./moves.js";
 import { CUES, STRENGTH } from "./formats.js";
-import { LIFTS, PRESET_ROWS, arrivingFromLifts } from "./lifts.js";
+import { ACCESSORY, LIFTS, PRESET_ROWS, arrivingFromLifts, moveById } from "./lifts.js";
 import { T } from "./i18n.js";
 import { generate, pick, sessionLoad } from "./generator.js";
 import { asText, headline } from "./text.js";
@@ -86,6 +86,8 @@ const CSS = `
 .scut{border:1px solid var(--rule);background:transparent;border-radius:2px;padding:4px 7px;
   font:inherit;font-size:11px;color:var(--ink-2);cursor:pointer}
 .scut:hover{border-color:var(--ink);color:var(--ink)}
+.grp{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);
+  margin:12px 0 3px;font-weight:600}
 .lifts{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
 .lift{border-bottom:1px solid #EFEEE9;padding:5px 0}
 .lift.on{background:#FAFAF7}
@@ -208,13 +210,18 @@ export default function App() {
     // eslint-disable-next-line
     [liftRows, oneRM]);
 
-  const toggleLift = (liftId) => setLiftRows((rows) =>
-    rows.some((r) => r.liftId === liftId)
-      ? rows.filter((r) => r.liftId !== liftId)
-      : [...rows, { liftId, sets: 5, reps: 5, kg: 0, pct: undefined }]);
+  const rowKey = (r) => r.liftId || r.moveId;
+  const findRow = (id) => liftRows.find((r) => rowKey(r) === id);
 
-  const editRow = (liftId, field, value) => setLiftRows((rows) =>
-    rows.map((r) => (r.liftId === liftId
+  const toggleRow = (id, kind) => setLiftRows((rows) =>
+    rows.some((r) => rowKey(r) === id)
+      ? rows.filter((r) => rowKey(r) !== id)
+      : [...rows, kind === "lift"
+          ? { liftId: id, sets: 5, reps: 5, kg: 0, pct: undefined }
+          : { moveId: id, sets: 3, reps: 8, kg: 0 }]);
+
+  const editRow = (id, field, value) => setLiftRows((rows) =>
+    rows.map((r) => (rowKey(r) === id
       ? { ...r, [field]: value === "" ? 0 : Number(value), ...(field === "kg" ? { pct: undefined } : {}) }
       : r)));
 
@@ -336,15 +343,16 @@ export default function App() {
                 ))}
               </div>
 
+              <p className="grp">{t.mainLifts}</p>
               <ul className="lifts">
                 {LIFTS.map((lift) => {
-                  const row = liftRows.find((r) => r.liftId === lift.id);
+                  const row = findRow(lift.id);
                   const rm = oneRM[lift.id] || 0;
                   const pct = row ? pctFor(row) : undefined;
                   return (
                     <li key={lift.id} className={row ? "lift on" : "lift"}>
                       <label className="lname">
-                        <input type="checkbox" checked={!!row} onChange={() => toggleLift(lift.id)} />
+                        <input type="checkbox" checked={!!row} onChange={() => toggleRow(lift.id, "lift")} />
                         <span>{lift[lang]}</span>
                       </label>
                       {row && (
@@ -363,9 +371,41 @@ export default function App() {
                               aria-label={`${t.oneRM} ${lift[lang]}`}
                               onChange={(e) => setOneRM({ ...oneRM, [lift.id]: Number(e.target.value) || 0 })} />
                           </span>
-                          <span className="pct mono">
-                            {pct ? `${Math.round(pct * 100)}%` : t.noRM}
-                          </span>
+                          <span className="pct mono">{pct ? `${Math.round(pct * 100)}%` : t.noRM}</span>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <p className="grp">{t.accessory}</p>
+              <ul className="lifts">
+                {ACCESSORY.map((acc) => {
+                  const move = moveById(acc.moveId);
+                  const row = findRow(acc.moveId);
+                  return (
+                    <li key={acc.moveId} className={row ? "lift on" : "lift"}>
+                      <label className="lname">
+                        <input type="checkbox" checked={!!row} onChange={() => toggleRow(acc.moveId, "acc")} />
+                        <span>{move[lang]}</span>
+                      </label>
+                      {row && (
+                        <div className="lfields">
+                          <input className="num mono" type="number" min="1" max="20" value={row.sets || ""}
+                            aria-label={t.sets} onChange={(e) => editRow(acc.moveId, "sets", e.target.value)} />
+                          <span className="x">&times;</span>
+                          <input className="num mono" type="number" min="1" max="60" value={row.reps || ""}
+                            aria-label={t.reps} onChange={(e) => editRow(acc.moveId, "reps", e.target.value)} />
+                          {move.side && <span className="unit">{t.perSide}</span>}
+                          {acc.refKg > 0 && (
+                            <>
+                              <input className="num kg mono" type="number" min="0" step="2.5" value={row.kg || ""}
+                                aria-label="kg" placeholder={String(acc.refKg)}
+                                onChange={(e) => editRow(acc.moveId, "kg", e.target.value)} />
+                              <span className="unit">kg</span>
+                            </>
+                          )}
                         </div>
                       )}
                     </li>
