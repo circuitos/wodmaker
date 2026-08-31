@@ -96,7 +96,44 @@ export const ACCESSORY = [
   { moveId: "sit_up", refKg: 0 },
   { moveId: "v_up", refKg: 0 },
   { moveId: "plank", refKg: 0 },
+  /* Machine and running work belongs here as well as in a conditioning piece:
+     it is common between the barbell and the WOD, and running in particular is
+     the one piece of supplementary work that needs no equipment at all. Priced
+     per unit by the movement's own `cost`, same as every other accessory, so a
+     500 m row is about 31 points and 400 m of running about 30. */
+  { moveId: "row_cal", refKg: 0 },
+  { moveId: "row_m", refKg: 0 },
+  { moveId: "run_m", refKg: 0 },
 ];
+
+/* A row is one of two kinds and they are two different blocks of a session:
+   heavy barbell work against a one-rep max, and the supplementary work that
+   sits between it and the conditioning piece. They are priced differently
+   already; this is what lets them be shown separately too. */
+export function splitRows(rows = []) {
+  return {
+    lifts: rows.filter((row) => row.liftId),
+    accessory: rows.filter((row) => row.moveId),
+  };
+}
+
+/* A fresh accessory row. Movements counted in reps take the usual three sets
+   of eight. A distance, calorie or time piece takes one set of the dose the
+   movement is normally prescribed at, because "3x8 m" is not a thing and a
+   24-second plank was not intended either. */
+export function defaultAccessoryRow(moveId) {
+  const move = moveById(moveId);
+  return move && move.unit !== "reps"
+    ? { moveId, sets: 1, reps: move.dose[1], kg: 0 }
+    : { moveId, sets: 3, reps: 8, kg: 0 };
+}
+
+/* How much of a movement one accessory set can hold. Reps cap at 60, but a
+   distance or calorie piece is written in hundreds of metres, so the ceiling
+   comes from the movement's own prescribed dose. */
+export function accessoryRepMax(move) {
+  return move ? Math.max(60, move.dose[1] * 5) : 60;
+}
 
 export const accessoryById = (id) => ACCESSORY.find((a) => a.moveId === id);
 export const moveById = (id) => MOVES.find((m) => m.id === id);

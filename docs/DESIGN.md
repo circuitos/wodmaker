@@ -473,3 +473,21 @@ Found while checking the ladder rungs at 390px, and it turned out to predate the
 Measured across 320, 360, 390, 430, 620, 768, 880 and 1280px: 25 workouts in the Day view and every week size from 2 to 5, zero horizontal overflow. Before the fix, 320px overflowed on 6 of 25 workouts and 390px on every one of them.
 
 One layout decision follows from what a ladder is for. When a rung list and a movement name compete for a narrow row, the rungs keep their line and the name wraps: the rungs are the number you train off, and breaking `20-16-12-8-4` across two lines to keep "m de carrera" intact gets the priority backwards.
+
+## The middle of a session is its own block
+
+Reported from use, describing how the sessions actually run: a warm-up, then barbell work, then accessory or supplementary work, then the piece. The app collapsed the middle two into one heading, "strength block before", so a set of walking lunges read as part of the same block as a 3x5 back squat. They are not the same block, and the app already knew it in every place except the card: the sidebar has had separate `Levantamientos` and `Accesorio` headings all along, and `arrivingFromLifts()` has always priced the two kinds of row by different formulas.
+
+`splitRows()` now separates them by row kind, and the day card, the week card and the plain-text export each render them as their own block. Nothing about the load model changed; this is the interface catching up with a distinction the data already made.
+
+One consequence worth having: a strength shortcut names the barbell block only. `presetFor()` reads the lifts alone, so accessory work no longer forces the shortcut to read `custom`, and `withPreset()` swaps the lifts while leaving the supplementary rows in place. Switching Monday from squats to pressing used to delete the accessory work as a side effect.
+
+## Rowing and running as supplementary work
+
+Also reported: a rower or a run is not only a conditioning movement. It sits between the barbell and the piece often enough to belong in the accessory grid, and running in particular is the one piece of supplementary work that needs no equipment, which makes it useful away from a gym.
+
+`row_cal`, `row_m` and `run_m` were already in `MOVES` and reach about 10% of gym sessions each as conditioning movements. Adding them to `ACCESSORY` needed no pricing work: `accessoryPoints()` charges per unit by the movement's own `cost`, so 500 m of rowing is 31 points, 400 m of running is 30, and 30 calories of rowing is 30. All three land near a minute and a half on the scale that puts a hard minute at 20.
+
+What did need work was the grid, which assumed every accessory is counted in reps. The dose ceiling was a flat 60 and a new row was seeded at 3x8, which gives "3x8 m of rowing". `accessoryRepMax()` takes the ceiling from the movement's own prescribed dose, `defaultAccessoryRow()` seeds a distance, calorie or time piece as one set of that dose, and the row shows its unit. This also fixes a plank, which had been defaulting to 3x8 seconds since it was added.
+
+The warm-up stays unlogged, for the reason already recorded above: the calibration was fitted against whole sessions that included their warm-ups, so logging one would count it twice.

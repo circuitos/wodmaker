@@ -1,14 +1,16 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, STRENGTH, cueFor } from "./formats.js";
-import { ACCESSORY, LIFTS, moveById, pctFor } from "./lifts.js";
+import {
+  ACCESSORY, LIFTS, accessoryRepMax, defaultAccessoryRow, moveById, pctFor, splitRows,
+} from "./lifts.js";
 import { T } from "./i18n.js";
 import { sessionLoad } from "./generator.js";
 import { asText, headline, repParts, strengthLine } from "./text.js";
 import { platesFor } from "./plates.js";
 import { loadPref, savePref } from "./prefs.js";
 import {
-  defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, rowsForPreset, weekCount, weekSummary,
+  defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, weekCount, weekSummary, withPreset,
 } from "./planner.js";
 import WeekPlanner from "./WeekPlanner.jsx";
 
@@ -117,6 +119,8 @@ const CSS = `
   font:inherit;font-size:12px;color:var(--ink);text-align:right}
 .num:focus{outline:2px solid var(--ink);outline-offset:1px}
 .num.kg{width:52px;margin-left:5px}
+/* A distance dose runs to four digits, which does not fit a rep counter. */
+.num.wide{width:60px}
 .x{color:var(--ink-2)}
 .unit,.pct{font-size:11px;color:var(--ink-2)}
 .rm{display:flex;align-items:center;gap:4px;margin-left:8px;font-size:10.5px;
@@ -156,6 +160,7 @@ const CSS = `
 .ico[aria-pressed="true"]{opacity:1;color:var(--red)}
 .cue{padding:0 18px 16px;font-size:13px;color:var(--ink-2);font-style:italic}
 .prev{padding:14px 18px 12px;border-bottom:2px solid var(--ink);background:#FAFAF7}
+.prevblock+.prevblock{margin-top:8px}
 .prevlist{list-style:none;margin:0;padding:0;font-size:13px;color:var(--ink-2)}
 .prevlist li{padding:2px 0}
 .prevlist li::before{content:"· ";color:var(--ink-2)}
@@ -329,13 +334,14 @@ export default function App() {
       ? liftRows.filter((r) => rowKey(r) !== id)
       : [...liftRows, kind === "lift"
           ? { liftId: id, sets: 5, reps: 5, kg: 0, pct: undefined }
-          : { moveId: id, sets: 3, reps: 8, kg: 0 }]);
+          : defaultAccessoryRow(id)]);
 
   const editRow = (id, field, value) => setRows(liftRows.map((r) => (rowKey(r) === id
     ? { ...r, [field]: value === "" ? 0 : Number(value), ...(field === "kg" ? { pct: undefined } : {}) }
     : r)));
 
-  const applyPreset = (id) => setRows(rowsForPreset(id, oneRM));
+  // A shortcut swaps the barbell block and leaves the accessory work alone.
+  const applyPreset = (id) => setRows(withPreset(liftRows, id, oneRM));
 
   const isLocked = (moveId) => (config.locks || []).some((l) => l.moveId === moveId);
   const toggleLock = (moveId) => {
@@ -549,8 +555,11 @@ export default function App() {
                           <input className="num mono" type="number" min="1" max="20" value={row.sets || ""}
                             aria-label={t.sets} onChange={(e) => editRow(acc.moveId, "sets", e.target.value)} />
                           <span className="x">&times;</span>
-                          <input className="num mono" type="number" min="1" max="60" value={row.reps || ""}
+                          <input className={move.unit === "reps" ? "num mono" : "num mono wide"}
+                            type="number" min="1" max={accessoryRepMax(move)}
+                            step={move.step} value={row.reps || ""}
                             aria-label={t.reps} onChange={(e) => editRow(acc.moveId, "reps", e.target.value)} />
+                          {move.unit !== "reps" && <span className="unit">{move.unit === "s" ? "s" : move.unit}</span>}
                           {move.side && <span className="unit">{t.perSide}</span>}
                           {acc.refKg > 0 && (
                             <>
@@ -579,14 +588,22 @@ export default function App() {
 
           {wod && (
             <main className="card">
+              {/* The barbell work and the accessory work are two blocks of the
+                  session, not one: what happens between the lifts and the
+                  conditioning piece stands on its own. */}
               {wod.strengthRows?.length > 0 && (
                 <div className="prev">
-                  <p className="lbl" style={{ margin: "0 0 4px" }}>{t.before}</p>
-                  <ul className="prevlist">
-                    {wod.strengthRows.map((r, i) => (
-                      <li key={i}>{strengthLine(r, lang, wod.oneRM || {})}</li>
+                  {[[t.mainLifts, splitRows(wod.strengthRows).lifts],
+                    [t.accessory, splitRows(wod.strengthRows).accessory]]
+                    .filter(([, rows]) => rows.length > 0)
+                    .map(([label, rows]) => (
+                      <div className="prevblock" key={label}>
+                        <p className="lbl" style={{ margin: "0 0 4px" }}>{label}</p>
+                        <ul className="prevlist">
+                          {rows.map((r, i) => <li key={i}>{strengthLine(r, lang, wod.oneRM || {})}</li>)}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
                 </div>
               )}
               <div className="card-h">

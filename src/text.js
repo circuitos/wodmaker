@@ -1,5 +1,5 @@
 import { T } from "./i18n.js";
-import { liftById, moveById, pctFor } from "./lifts.js";
+import { liftById, moveById, pctFor, splitRows } from "./lifts.js";
 /* =========================== TEXT RENDERING =========================== */
 
 /* A ladder's rungs for one movement. The format's scheme is a shape, not a
@@ -80,9 +80,13 @@ export function headline(c, lang) {
 export function asText(c, lang, env) {
   const t = T[lang];
   const lines = [];
-  if (c.strengthRows?.length) {
-    lines.push(t.before);
-    c.strengthRows.forEach((r) => lines.push(`· ${strengthLine(r, lang, c.oneRM || {})}`));
+  /* Three blocks, in the order they happen: the barbell work, the accessory
+     work between it and the conditioning piece, then the piece itself. */
+  const { lifts, accessory } = splitRows(c.strengthRows || []);
+  for (const [label, rows] of [[t.mainLifts, lifts], [t.accessory, accessory]]) {
+    if (!rows.length) continue;
+    lines.push(label);
+    rows.forEach((r) => lines.push(`· ${strengthLine(r, lang, c.oneRM || {})}`));
     lines.push("");
   }
   lines.push(headline(c, lang), "");

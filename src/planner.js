@@ -1,7 +1,9 @@
 import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, intensityK } from "./formats.js";
 import { generate, sessionAxisLoad, sessionLoad } from "./generator.js";
-import { PRESET_ROWS, arrivingFromAxis, arrivingFromLifts, liftById, moveById, pctFor } from "./lifts.js";
+import {
+  PRESET_ROWS, arrivingFromAxis, arrivingFromLifts, liftById, moveById, pctFor, splitRows,
+} from "./lifts.js";
 import { CORPUS_DEFAULTS } from "./corpus.js";
 
 /* A point on Monday is not a point still carried in full on Wednesday. This
@@ -43,12 +45,21 @@ export function rowsForPreset(id, oneRM = {}) {
 const rowKey = (row) => `${row.liftId || row.moveId}:${row.sets}x${row.reps}`;
 const rowsKey = (rows) => (rows || []).map(rowKey).sort().join("|");
 
-/* Which shortcut a day's rows correspond to, or "custom" once they have been
-   edited away from all of them. The rows are the stored fact; the preset name
-   is derived, so the two can never disagree. */
+/* Which shortcut a day's barbell work corresponds to, or "custom" once it has
+   been edited away from all of them. The rows are the stored fact; the preset
+   name is derived, so the two can never disagree.
+
+   Only the lifts are considered. A shortcut names the heavy block, and the
+   accessory work between it and the conditioning piece is a separate part of
+   the session that a squat day and a press day can share. */
 export function presetFor(rows) {
-  const key = rowsKey(rows);
+  const key = rowsKey(splitRows(rows).lifts);
   return Object.keys(PRESET_ROWS).find((id) => rowsKey(PRESET_ROWS[id]) === key) || "custom";
+}
+
+/* Swap the barbell block for a shortcut and leave the accessory work alone. */
+export function withPreset(rows, id, oneRM = {}) {
+  return [...rowsForPreset(id, oneRM), ...splitRows(rows).accessory];
 }
 
 export function defaultWeekConfig(count = 2, oneRM = {}) {

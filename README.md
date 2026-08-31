@@ -29,6 +29,8 @@ The live site is auto-deployed from the default branch. Every other branch gets 
 
 The app has one model and two views of it. A week is a list of days, and a day carries everything about a session: which weekday, where you train, how hard, the strength block, and anything you locked.
 
+A session is three blocks in the order they happen: barbell work against a one-rep max, then the accessory or supplementary work between it and the piece, then the conditioning piece itself. The strength shortcuts name the barbell block only, so switching from squats to pressing leaves your supplementary work alone.
+
 The **Day** view is an editor for one day of that week, with a switcher across the top. Everything on it writes to that day: change where you train, tick a lift, lock a movement you like, swap one you don't, or press "Another" to redraw just that day. Because the day belongs to a week, it already arrives with the fatigue carried from the days before it.
 
 The **Week** view is the overview of the same days: the weekly load, the balance across the six axes, and a card per day. "Edit day" opens that day in the Day view. Nothing is generated twice, so the first day of the week and the Day view are the same session, down to the reps.

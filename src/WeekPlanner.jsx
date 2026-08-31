@@ -3,7 +3,8 @@ import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, STRENGTH, cueFor } from "./formats.js";
 import { T } from "./i18n.js";
 import { sessionLoad } from "./generator.js";
-import { WEEK_COUNTS, rowsForPreset } from "./planner.js";
+import { splitRows } from "./lifts.js";
+import { WEEK_COUNTS, withPreset } from "./planner.js";
 import { asText, headline, repParts, strengthLine } from "./text.js";
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
@@ -119,7 +120,7 @@ export default function WeekPlanner({
                 <label>
                   <span>{t.planner.focus}</span>
                   <select value={wod.plan.preset}
-                    onChange={(event) => onPatchDay({ rows: rowsForPreset(event.target.value, oneRM) }, index)}>
+                    onChange={(event) => onPatchDay({ rows: withPreset(config.rows, event.target.value, oneRM) }, index)}>
                     {STRENGTH.map((focus) => <option key={focus.id} value={focus.id}>{t.strength[focus.id]}</option>)}
                     {wod.plan.preset === "custom" && <option value="custom">{t.planner.currentGrid}</option>}
                   </select>
@@ -139,16 +140,17 @@ export default function WeekPlanner({
                 </label>
               </div>
 
-              {wod.strengthRows.length > 0 && (
-                <div className="day-strength">
-                  <p className="grp">{t.before}</p>
-                  <ul>
-                    {wod.strengthRows.map((row, rowIndex) => (
-                      <li key={rowIndex}>{strengthLine(row, lang, oneRM)}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {[[t.mainLifts, splitRows(wod.strengthRows).lifts],
+                [t.accessory, splitRows(wod.strengthRows).accessory]]
+                .filter(([, rows]) => rows.length > 0)
+                .map(([label, rows]) => (
+                  <div className="day-strength" key={label}>
+                    <p className="grp">{label}</p>
+                    <ul>
+                      {rows.map((row, rowIndex) => <li key={rowIndex}>{strengthLine(row, lang, oneRM)}</li>)}
+                    </ul>
+                  </div>
+                ))}
 
               <div className="day-wod">
                 <div className="day-wod-head">

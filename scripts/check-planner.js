@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
-import { daySeed, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, presetFor, rowsForPreset, weekSummary }
-  from "../src/planner.js";
+import {
+  daySeed, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, presetFor, rowsForPreset,
+  weekSummary, withPreset,
+} from "../src/planner.js";
 import { sessionLoad } from "../src/generator.js";
 import { FORMATS } from "../src/formats.js";
 import { ladderRungs } from "../src/text.js";
+import { accessoryById, accessoryPoints, accessoryRepMax, moveById } from "../src/lifts.js";
 
 const shape = (plan) => plan.map((wod) => ({
   format: wod.fmt.id,
@@ -154,5 +157,24 @@ for (let seed = 1; seed <= 400; seed += 1) {
   }
 }
 assert(laddersChecked > 20, "the ladder sweep should see a useful number of ladders");
+
+/* The barbell block and the accessory block are two parts of a session. A
+   strength shortcut names the first and must leave the second alone. */
+const withRun = [...rowsForPreset("lower", { back_squat: 130 }),
+  { moveId: "run_m", sets: 1, reps: 400, kg: 0 }];
+assert.equal(presetFor(withRun), "lower", "accessory work does not make the barbell block custom");
+const pressed = withPreset(withRun, "press", { bench: 87 });
+assert.equal(presetFor(pressed), "press", "switching the shortcut switches the lifts");
+assert.deepEqual(pressed.filter((row) => row.moveId), withRun.filter((row) => row.moveId),
+  "switching the shortcut keeps the accessory work");
+
+/* Machine and running work is priced per unit by the movement's own cost, on
+   the same scale as everything else: about 20 points to a hard minute. */
+for (const [moveId, reps, expected] of [["row_m", 500, 31], ["run_m", 400, 30], ["row_cal", 30, 30]]) {
+  assert(accessoryById(moveId), `${moveId} is offered as accessory work`);
+  const points = accessoryPoints({ moveId, sets: 1, reps, kg: 0 });
+  assert(Math.abs(points - expected) < 2, `${moveId} at ${reps} should cost about ${expected}, got ${points.toFixed(1)}`);
+  assert(accessoryRepMax(moveById(moveId)) >= reps, `${moveId} must accept a dose of ${reps}`);
+}
 
 console.log(`Planner check passed for deterministic 2, 3, 4, and 5-day weeks (${swapsTested} swaps, ${laddersChecked} ladders).`);
