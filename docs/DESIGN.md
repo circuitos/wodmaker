@@ -172,3 +172,78 @@ A note on wording: `sessionStorage` is forgotten when the tab closes, `localStor
 Built as `src/prefs.js`, holding both the meter's visibility and the language. Verified in a browser: both survive a reload, a fresh visitor gets the defaults (meter shown, Spanish), and with `localStorage` rigged to throw the page still renders and the toggle still works for the session.
 
 **The 3.6x spread is not a bug.** Formats differ in how much work they are, and that variety is wanted. Recorded in Problem 2, which now explains what the spread costs rather than arguing it should go. The knock-on is that the load control is relative rather than absolute, which is what makes step 4 small.
+
+---
+
+# The strength block
+
+## What is there now, and why it does not fit
+
+A dropdown of seven presets. Each carries a hand-authored `pre` (axis points) and a `dampen` factor.
+
+The thing to notice: **there are no barbell lifts anywhere in this app.** `MOVES` is dumbbell, kettlebell and bodyweight conditioning work. Nothing named squat, bench or deadlift exists as data. So the strength side is a stub: seven labels with tuned numbers behind them and no lifts underneath.
+
+That is why it falls outside real training. It is not modelling your session, it is approximating a category.
+
+## The check
+
+**Does the app already half-model this?** Yes, and badly. `STRENGTH.pre` means "the axis load this leaves you carrying", which is what `MOVES.load` already means for conditioning movements. Two representations of one idea, and the strength one has no movements behind it. A lift grid replaces the stub with the representation the app already uses everywhere else.
+
+**What does it make redundant?** The seven presets and their hand-tuned `pre` maps. `pre` becomes computed from what you actually lifted rather than looked up, and `dampen` probably follows: with per-lift axis shares in hand, the leg-versus-upper difference that made `dampen` non-derivable becomes something we can read off the lift instead of guessing.
+
+**Where does it live on screen?** The left column holds two short controls today, so there is room. The dropdown becomes a small grid: one row per lift, a checkbox, sets, reps, and a load field.
+
+**Does it need groundwork?** Yes, and it is already queued. Step 5 generalises `pre` from "what the strength preset left you with" to "the axis load you arrive carrying, whatever its source". The lift grid is a second source for exactly that, so the week planner and this feature need the same commit first.
+
+## The shape
+
+A new `src/lifts.js`, sibling to `moves.js`, same idea:
+
+```js
+{ id: "bench", es: "press banca", en: "bench press",
+  load: { empuje: 0.74, core: 0.17, traccion: 0.09 },  // axis shares, sum to 1
+  toll: 1.0 }                                          // effort per rep against the baseline
+```
+
+Points for one lift:
+
+```
+sets * reps * 5 * (weight / oneRM / 0.75) * toll
+```
+
+Five points per working rep at 75% of one-rep max, scaled by how heavy you actually went and by what that lift takes out of you.
+
+## Does the formula match the numbers already in the app?
+
+Checked against the authored presets, which is the same discipline step 3 used:
+
+| Preset | Authored | A typical session | Formula |
+|---|---:|---|---:|
+| press | 115 | bench 5x4 at 86% | 114 |
+| squat | 140 | squat 5x5 at 85% | 142 |
+| pull | 140 | weighted pull-up 5x5 at 80% | 133 |
+| lower | 185 | squat and RDL, 6 working sets | 164 |
+| full | 260 | four lifts, 8 working sets | 213 |
+| deadlift | 185 | deadlift 5x3 at 90% | 90 |
+
+Four of six land close. Deadlift is the useful miss: 15 heavy reps score 90 against an authored 185. That is not a broken formula, it is the thing `toll` exists for. A deadlift rep costs about twice what its rep count suggests, so deadlift gets `toll: 2`. Per-lift facts belong in the lift's own entry, which is the rule `MOVES` already follows and the reason the generator never learns about specific movements.
+
+## Where the one-rep maxes live
+
+A 1RM is a fact about the person, not about today. It moves every few months, and nobody wants to retype it daily.
+
+So it goes in `prefs.js`, which already exists and is already backed by localStorage. Today's block then asks only: which lifts, sets, reps, and load. The load field takes either kg or a percentage and shows the other, computed from the stored 1RM, so you type whichever number you have in your head. Someone with no 1RM entered just types kg and gets a rougher estimate.
+
+## What it costs
+
+The seven presets stop being the model. They can survive as one-tap shortcuts that tick a few rows, or go.
+
+`pre` and `dampen` become computed, so generated workouts change. This is a real behaviour change, not a no-op like step 3, and the smoke report will move. Calibrate so the presets reproduce first, then read the diff deliberately.
+
+A lifts table has to be written: maybe a dozen entries with axis shares and tolls. That is data work, and it is the part that decides whether the feature is any good.
+
+## Open questions
+
+1. **A fixed list of lifts, or editable?** A fixed dozen (back squat, front squat, deadlift, RDL, bench, overhead press, weighted pull-up, barbell row, hip thrust, lunge) covers most training and keeps the grid scannable. Editable means storing user-defined lifts and asking the user for axis shares, which is not a thing anyone wants to fill in.
+2. **Keep the presets as shortcuts, or drop them?** They are useful on a day you cannot be bothered to type numbers.
+3. **What is the weighted sit-up?** 95 kg off a 130 kg max is not a standard barbell lift, and its axis shares decide whether the generator thinks you hammered your core, your hip flexors, or your legs. Machine, decline bench with a plate, GHD? This one I cannot guess.
