@@ -536,4 +536,20 @@ Sizing the accessory block per environment was the first attempt and it produced
 
 `PRE_BUDGET` covers the barbell block and the accessory block together, so the accessories are only asked for what the lifts do not already deliver: a park day keeping weighted pull-ups draws about one accessory movement, one with no barbell draws five. At the gym the budget is `null`, meaning the accessory block keeps the size the source log gives it, because there the barbell is doing the work and the log has real data about it. The park and home figures have no such backing and are labelled a product choice, as every session in the log was a gym session.
 
-What this does not fix: a living room still has no pulling movement at all, which is why the `nopull` warning is nearly universal there. That remains a gap in `MOVES`, and the fix is a movement rather than a coefficient.
+What this did not fix at the time: a living room had no pulling movement at all, which is why the `nopull` warning was nearly universal there. That was a gap in `MOVES`, and the section below closes it.
+
+## Dumbbells live at home
+
+Reported, once the environments were separated and the gap was visible: there are light-medium dumbbells at home, so anything a light-medium dumbbell can do belongs there.
+
+The line has to be drawn somewhere and it is a judgement about one person's kit rather than anything derivable, so it is written down as a rule: a movement moves home if its prescription starts at 15 kg or less per hand for a pair, or 20 kg or less for a single. That takes `devil_press`, `thruster`, `clean_jerk`, `db_push_press`, `db_push_press_uni`, `db_row` and `renegade_row`. It leaves `db_snatch` at 22.5 and `hang_clean` at 2x17.5-20 just outside, and leaves everything needing kit that is not a dumbbell where it was: kettlebell swings and snatches, slam balls, wall balls, the sandbag work, and the 32 kg goblet squat.
+
+None of them reach a park. Nobody carries dumbbells to a park, which is the whole reason the environments differ, so home now offers more accessory movements than a park does. That reads as an inversion and is correct.
+
+The effect on the sweep, which is why `out/smoke-report.md` moves in this commit rather than staying identical:
+
+- **`nopull` fell from 31.2% of all sessions to 15.3%**, and at home specifically from 93.7% to 56.2%. Home went from no pulling movement at all to carrying one in 40.6% of sessions. The warning finally carries information there: it now tells you this particular session skipped pulling, which is something a swap can fix, rather than restating that the movement pool has a hole in it.
+- **The `traccion` axis share rose from 0.096 to 0.133** across all environments, since seven movements went from one pool to three.
+- **A home session went from a mean of 276 points to 287.** Hard faults stayed at zero.
+
+`npm run check:planner` pins both lists by name. The rule cannot be recovered from the `kg` string at run time, and a future data edit that quietly sends a 32 kg kettlebell home should fail rather than pass silently.

@@ -49,17 +49,17 @@ export const MOVES = [
     load: { piernas: 0.3, empuje: 0.3, core: 0.25, posterior: 0.15 } },
   { id: "burpee_bjo", es: "burpee box jump overs", en: "burpee box jump overs", pat: "full", env: ["gym", "parque"], unit: "reps", dose: [8, 12], step: 1, cost: 3.6, skill: 2, imp: 2,
     load: { piernas: 0.4, empuje: 0.2, core: 0.2, posterior: 0.2 } },
-  { id: "devil_press", es: "devil press", en: "devil press", pat: "full", env: ["gym"], unit: "reps", dose: [8, 10], step: 1, cost: 4.0, skill: 2, imp: 1, kg: "2×12,5 kg",
+  { id: "devil_press", es: "devil press", en: "devil press", pat: "full", env: ["gym", "casa"], unit: "reps", dose: [8, 10], step: 1, cost: 4.0, skill: 2, imp: 1, kg: "2×12,5 kg",
     load: { empuje: 0.35, posterior: 0.3, piernas: 0.2, agarre: 0.15 } },
   { id: "db_snatch", es: "DB snatch alternos", en: "alt. DB snatch", pat: "full", env: ["gym"], unit: "reps", dose: [10, 12], step: 2, cost: 2.1, skill: 2, imp: 1, kg: "22,5 kg",
     load: { posterior: 0.4, empuje: 0.25, piernas: 0.2, agarre: 0.15 } },
   { id: "kb_snatch", es: "KB snatch alternos", en: "alt. KB snatch", pat: "full", env: ["gym"], unit: "reps", dose: [8, 10], step: 2, cost: 2.3, skill: 3, imp: 1, kg: "24 kg",
     load: { posterior: 0.4, empuje: 0.25, piernas: 0.2, agarre: 0.15 } },
-  { id: "thruster", es: "DB thrusters", en: "DB thrusters", pat: "full", env: ["gym"], unit: "reps", dose: [10, 12], step: 1, cost: 2.8, skill: 2, imp: 0, kg: "2×12,5-15 kg",
+  { id: "thruster", es: "DB thrusters", en: "DB thrusters", pat: "full", env: ["gym", "casa"], unit: "reps", dose: [10, 12], step: 1, cost: 2.8, skill: 2, imp: 0, kg: "2×12,5-15 kg",
     load: { piernas: 0.35, empuje: 0.4, core: 0.15, agarre: 0.1 } },
   { id: "hang_clean", es: "DB hang clean", en: "DB hang clean", pat: "full", env: ["gym"], unit: "reps", dose: [8, 10], step: 1, cost: 2.2, skill: 2, imp: 0, kg: "2×17,5-20 kg",
     load: { posterior: 0.4, traccion: 0.2, piernas: 0.25, agarre: 0.15 } },
-  { id: "clean_jerk", es: "hang clean and jerk", en: "hang clean and jerk", pat: "full", env: ["gym"], unit: "reps", dose: [8, 10], step: 1, cost: 2.6, skill: 3, imp: 0, kg: "2×15-17,5 kg",
+  { id: "clean_jerk", es: "hang clean and jerk", en: "hang clean and jerk", pat: "full", env: ["gym", "casa"], unit: "reps", dose: [8, 10], step: 1, cost: 2.6, skill: 3, imp: 0, kg: "2×15-17,5 kg",
     load: { posterior: 0.3, empuje: 0.3, piernas: 0.25, agarre: 0.15 } },
 
   /* ---------- HINGE / POSTERIOR ---------- */
@@ -81,9 +81,9 @@ export const MOVES = [
     load: { empuje: 0.75, core: 0.25 } },
   { id: "ring_dip", es: "ring dips", en: "ring dips", pat: "push", env: ["gym"], unit: "reps", dose: [6, 10], step: 1, cost: 2.0, skill: 3, imp: 0,
     load: { empuje: 0.7, core: 0.15, agarre: 0.15 } },
-  { id: "db_push_press", es: "DB push press", en: "DB push press", pat: "push", env: ["gym"], unit: "reps", dose: [10, 12], step: 1, cost: 1.6, skill: 1, imp: 0, kg: "2×15 kg",
+  { id: "db_push_press", es: "DB push press", en: "DB push press", pat: "push", env: ["gym", "casa"], unit: "reps", dose: [10, 12], step: 1, cost: 1.6, skill: 1, imp: 0, kg: "2×15 kg",
     load: { empuje: 0.6, piernas: 0.2, core: 0.2 } },
-  { id: "db_push_press_uni", es: "DB push press unilateral", en: "single-arm DB push press", pat: "push", env: ["gym"], unit: "reps", dose: [8, 10], step: 1, cost: 1.6, skill: 2, imp: 0, side: true, kg: "17,5 kg",
+  { id: "db_push_press_uni", es: "DB push press unilateral", en: "single-arm DB push press", pat: "push", env: ["gym", "casa"], unit: "reps", dose: [8, 10], step: 1, cost: 1.6, skill: 2, imp: 0, side: true, kg: "17,5 kg",
     load: { empuje: 0.55, core: 0.3, piernas: 0.15 } },
 
   /* ---------- PULL ---------- */
@@ -91,9 +91,9 @@ export const MOVES = [
     load: { traccion: 0.65, core: 0.2, agarre: 0.15 } },
   { id: "pull_up", es: "dominadas", en: "pull-ups", pat: "pull", env: ["gym", "parque"], unit: "reps", dose: [6, 10], step: 1, cost: 2.0, skill: 2, imp: 0,
     load: { traccion: 0.6, agarre: 0.25, core: 0.15 } },
-  { id: "db_row", es: "remo con mancuerna", en: "DB row", pat: "pull", env: ["gym"], unit: "reps", dose: [10, 12], step: 1, cost: 1.2, skill: 1, imp: 0, side: true, kg: "20-24 kg",
+  { id: "db_row", es: "remo con mancuerna", en: "DB row", pat: "pull", env: ["gym", "casa"], unit: "reps", dose: [10, 12], step: 1, cost: 1.2, skill: 1, imp: 0, side: true, kg: "20-24 kg",
     load: { traccion: 0.65, agarre: 0.2, core: 0.15 } },
-  { id: "renegade_row", es: "remo renegado", en: "renegade row", pat: "pull", env: ["gym"], unit: "reps", dose: [8, 10], step: 1, cost: 1.8, skill: 2, imp: 0, side: true, kg: "2×15 kg",
+  { id: "renegade_row", es: "remo renegado", en: "renegade row", pat: "pull", env: ["gym", "casa"], unit: "reps", dose: [8, 10], step: 1, cost: 1.8, skill: 2, imp: 0, side: true, kg: "2×15 kg",
     load: { traccion: 0.4, core: 0.35, empuje: 0.15, agarre: 0.1 } },
 
   /* ---------- LEGS / JUMPS ---------- */

@@ -15,13 +15,13 @@ Load in points, where 20 points is about one hard minute of work.
 
 | Format | Share | Cond mean | Cond p10 | Cond p90 | Load mean | Load min | Load max | Items | Hard faults |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| amrap | 22.6% | 190.6 | 146 | 233 | 322.1 | 131 | 522 | 3.8 | 0.000 |
-| fortime | 24.2% | 174.8 | 149 | 205 | 308.5 | 160 | 547 | 4.5 | 0.000 |
-| emom | 24.0% | 130.2 | 97 | 164 | 256.6 | 70 | 387 | 2.9 | 0.000 |
-| intervals | 6.1% | 81.5 | 59 | 108 | 209.0 | 55 | 386 | 2.0 | 0.000 |
-| ladder | 9.4% | 91.4 | 78 | 105 | 213.3 | 90 | 362 | 2.9 | 0.000 |
-| chipper | 7.9% | 132.6 | 121 | 152 | 266.5 | 93 | 368 | 4.3 | 0.000 |
-| quality | 5.8% | 74.5 | 54 | 92 | 198.1 | 38 | 315 | 3.4 | 0.000 |
+| amrap | 24.1% | 197.3 | 151 | 245 | 327.6 | 150 | 547 | 3.9 | 0.000 |
+| fortime | 22.0% | 179.9 | 149 | 221 | 316.1 | 160 | 531 | 4.6 | 0.000 |
+| emom | 24.9% | 130.5 | 97 | 164 | 256.7 | 70 | 392 | 3.0 | 0.000 |
+| intervals | 6.0% | 87.3 | 59 | 126 | 208.7 | 55 | 404 | 2.0 | 0.000 |
+| ladder | 9.8% | 94.4 | 79 | 113 | 217.4 | 90 | 372 | 3.0 | 0.000 |
+| chipper | 7.8% | 133.0 | 121 | 153 | 267.1 | 119 | 368 | 4.4 | 0.000 |
+| quality | 5.5% | 76.9 | 58 | 93 | 203.2 | 38 | 316 | 3.5 | 0.000 |
 
 ## Session load by environment
 
@@ -29,19 +29,19 @@ Load in points, where 20 points is about one hard minute of work.
 |---|---:|---:|---:|---:|---:|
 | gym | 276.3 | 182 | 372 | 3.6 | 0.000 |
 | parque | 270.5 | 179 | 366 | 3.6 | 0.000 |
-| casa | 276.4 | 184 | 372 | 3.6 | 0.000 |
+| casa | 287.3 | 186 | 388 | 3.7 | 0.000 |
 
 ## Session load by strength block
 
 | Strength | Load mean | p10 | p90 | Items | Hard faults |
 |---|---:|---:|---:|---:|---:|
-| none | 155.7 | 89 | 212 | 3.5 | 0.000 |
-| squat | 260.9 | 203 | 322 | 3.5 | 0.000 |
-| deadlift | 301.5 | 242 | 362 | 3.6 | 0.000 |
-| press | 257.3 | 192 | 326 | 3.6 | 0.000 |
-| pull | 270.4 | 208 | 336 | 3.5 | 0.000 |
-| lower | 301.8 | 245 | 361 | 3.6 | 0.000 |
-| full | 373.4 | 314 | 430 | 3.7 | 0.000 |
+| none | 157.3 | 94 | 223 | 3.5 | 0.000 |
+| squat | 267.3 | 204 | 334 | 3.6 | 0.000 |
+| deadlift | 304.0 | 242 | 368 | 3.6 | 0.000 |
+| press | 259.5 | 194 | 329 | 3.7 | 0.000 |
+| pull | 273.1 | 209 | 346 | 3.5 | 0.000 |
+| lower | 305.5 | 245 | 369 | 3.7 | 0.000 |
+| full | 379.5 | 317 | 444 | 3.9 | 0.000 |
 
 ## Axis shares
 
@@ -49,18 +49,18 @@ Share of total effort taken by each axis, averaged over every workout.
 
 | Axis | Mean | p10 | p90 |
 |---|---:|---:|---:|
-| piernas | 0.225 | 0.106 | 0.344 |
-| posterior | 0.146 | 0.029 | 0.257 |
-| empuje | 0.181 | 0.017 | 0.339 |
-| traccion | 0.096 | 0.000 | 0.259 |
-| core | 0.288 | 0.204 | 0.353 |
-| agarre | 0.064 | 0.000 | 0.153 |
+| piernas | 0.207 | 0.095 | 0.333 |
+| posterior | 0.135 | 0.000 | 0.252 |
+| empuje | 0.167 | 0.014 | 0.314 |
+| traccion | 0.133 | 0.000 | 0.283 |
+| core | 0.274 | 0.181 | 0.350 |
+| agarre | 0.085 | 0.000 | 0.155 |
 
 ## Warnings raised
 
 | Warning | Count | Per workout |
 |---|---:|---:|
-| nopull | 2619 | 0.312 |
+| nopull | 1282 | 0.153 |
 | grip | 14 | 0.002 |
 
 ## Movement frequency
@@ -69,46 +69,49 @@ Movements that never appear are unreachable: check their `env` and `pat`.
 
 | Movement | Count | Share of slots |
 |---|---:|---:|
-| burpee | 2493 | 0.083 |
-| bear_crawl | 2299 | 0.076 |
-| push_up | 1850 | 0.061 |
-| pull_up | 1683 | 0.056 |
-| glute_bridge | 1674 | 0.056 |
-| superman | 1456 | 0.048 |
-| plank | 1384 | 0.046 |
-| pike_push_up | 1097 | 0.036 |
-| jacks | 983 | 0.033 |
-| hollow | 957 | 0.032 |
-| mtn_climb | 877 | 0.029 |
-| side_plank | 826 | 0.027 |
-| high_knees | 799 | 0.027 |
+| bear_crawl | 2208 | 0.072 |
+| pull_up | 1683 | 0.055 |
+| glute_bridge | 1468 | 0.048 |
+| db_row | 1339 | 0.044 |
+| superman | 1335 | 0.044 |
+| push_up | 1317 | 0.043 |
+| plank | 1176 | 0.038 |
+| jacks | 1089 | 0.036 |
+| burpee | 1007 | 0.033 |
+| hollow | 996 | 0.033 |
+| side_plank | 926 | 0.030 |
+| mtn_climb | 904 | 0.030 |
+| high_knees | 874 | 0.029 |
+| sit_up | 785 | 0.026 |
 | run_m | 749 | 0.025 |
-| broad_jump | 692 | 0.023 |
+| renegade_row | 700 | 0.023 |
 | knee_raise | 676 | 0.022 |
-| sit_up | 640 | 0.021 |
-| walking_lunge | 575 | 0.019 |
-| step_up | 567 | 0.019 |
-| air_squat | 443 | 0.015 |
+| db_push_press | 642 | 0.021 |
+| devil_press | 611 | 0.020 |
+| broad_jump | 582 | 0.019 |
+| pike_push_up | 575 | 0.019 |
+| v_up | 523 | 0.017 |
+| walking_lunge | 514 | 0.017 |
+| step_up | 505 | 0.017 |
+| thruster | 484 | 0.016 |
+| air_squat | 425 | 0.014 |
+| clean_jerk | 409 | 0.013 |
 | skips | 395 | 0.013 |
 | burpee_bjo | 392 | 0.013 |
 | toes_to_bar | 387 | 0.013 |
-| v_up | 373 | 0.012 |
 | row_m | 372 | 0.012 |
-| db_row | 355 | 0.012 |
+| db_push_press_uni | 367 | 0.012 |
 | ring_row | 341 | 0.011 |
 | slamball | 331 | 0.011 |
-| bike_cal | 320 | 0.011 |
+| bike_cal | 320 | 0.010 |
 | box_step_over | 314 | 0.010 |
 | farmer_carry | 306 | 0.010 |
 | row_cal | 298 | 0.010 |
-| db_push_press | 288 | 0.010 |
 | ski_cal | 279 | 0.009 |
 | suitcase_carry | 275 | 0.009 |
-| cossack | 272 | 0.009 |
-| sandbag_carry | 256 | 0.009 |
+| sandbag_carry | 256 | 0.008 |
 | kb_swing | 251 | 0.008 |
-| renegade_row | 234 | 0.008 |
-| db_push_press_uni | 157 | 0.005 |
+| cossack | 221 | 0.007 |
 | ring_push_up | 152 | 0.005 |
 | box_jump | 141 | 0.005 |
 | ring_dip | 118 | 0.004 |
@@ -116,10 +119,7 @@ Movements that never appear are unreachable: check their `env` and `pat`.
 | goblet_squat | 90 | 0.003 |
 | hang_clean | 85 | 0.003 |
 | db_snatch | 83 | 0.003 |
-| devil_press | 81 | 0.003 |
-| thruster | 81 | 0.003 |
 | wall_ball | 77 | 0.003 |
-| clean_jerk | 64 | 0.002 |
 | box_jump_over | 56 | 0.002 |
 | kb_snatch | 49 | 0.002 |
 

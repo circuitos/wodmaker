@@ -5,6 +5,7 @@ import {
 } from "../src/planner.js";
 import { sessionLoad } from "../src/generator.js";
 import { FORMATS } from "../src/formats.js";
+import { MOVES } from "../src/moves.js";
 import { ladderRungs } from "../src/text.js";
 import {
   accessoryById, accessoryPoints, accessoryRepMax, moveById, rowAvailable, splitRows,
@@ -64,6 +65,29 @@ assert.equal(stale[1].weekday, 4, "a valid saved day is kept exactly");
 assert.equal(stale[1].env, "gym");
 assert.equal(stale[1].intensity, "hard");
 assert.equal(presetFor(stale[1].rows), "press", "a saved focus id migrates into stored rows");
+
+/* Home has dumbbells, so a movement asking for a light-medium pair or a single
+   under about 20 kg can be done there. Anything heavier, and anything needing
+   kit that is not a dumbbell, stays at the gym. The rule is a judgement about
+   one person's equipment, so it is pinned here rather than inferred from the
+   `kg` string at run time: a future data edit that quietly sends a 32 kg
+   kettlebell home should fail this. */
+const HOME_LOADED = ["devil_press", "thruster", "clean_jerk", "db_push_press", "db_push_press_uni",
+  "db_row", "renegade_row"];
+const GYM_ONLY_LOADED = ["db_snatch", "kb_snatch", "hang_clean", "kb_swing", "slamball", "wall_ball",
+  "goblet_squat", "lunge_bag", "farmer_carry", "sandbag_carry"];
+for (const id of HOME_LOADED) {
+  assert(moveById(id).env.includes("casa"), `${id} is a light-medium dumbbell movement and works at home`);
+  assert.equal(moveById(id).env.includes("parque"), false, `${id} needs dumbbells, which do not travel to a park`);
+}
+for (const id of GYM_ONLY_LOADED) {
+  assert.equal(moveById(id).env.includes("casa"), false, `${id} needs more than a light-medium dumbbell`);
+}
+
+/* Closing that gap is what gives home any pulling at all. It used to have
+   none, which made the `nopull` warning fire on almost every home session. */
+assert(MOVES.some((move) => move.pat === "pull" && move.env.includes("casa")),
+  "home must have at least one pulling movement");
 
 /* Where you train decides the whole session, not just the conditioning piece.
    A barbell is not available in a park, so the block you asked for is kept as
