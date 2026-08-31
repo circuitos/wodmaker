@@ -4,7 +4,7 @@ import { INTENSITY, STRENGTH, cueFor } from "./formats.js";
 import { T } from "./i18n.js";
 import { sessionLoad } from "./generator.js";
 import { splitRows } from "./lifts.js";
-import { WEEK_COUNTS, presetsFor, rowsForEnv, withPreset } from "./planner.js";
+import { WEEK_COUNTS, changeEnv, presetsFor, withPreset } from "./planner.js";
 import { asText, headline, repParts, strengthLine } from "./text.js";
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
@@ -121,7 +121,6 @@ export default function WeekPlanner({
                   <span>{t.planner.focus}</span>
                   <select value={wod.plan.preset}
                     onChange={(event) => onPatchDay({
-                      preset: event.target.value,
                       rows: withPreset(config.rows, event.target.value, oneRM),
                     }, index)}>
                     {STRENGTH.filter((focus) => presetsFor(config.env).includes(focus.id))
@@ -131,10 +130,9 @@ export default function WeekPlanner({
                 </label>
                 <label>
                   <span>{t.where}</span>
-                  <select value={config.env} onChange={(event) => onPatchDay({
-                      env: event.target.value,
-                      rows: rowsForEnv(config.preset, event.target.value, oneRM, wod.plan.seed),
-                    }, index)}>
+                  <select value={config.env} onChange={(event) => onPatchDay(
+                      changeEnv(config, event.target.value, oneRM, wod.plan.seed), index,
+                    )}>
                     {ENVS.map((env) => <option key={env} value={env}>{t[env]}</option>)}
                   </select>
                 </label>

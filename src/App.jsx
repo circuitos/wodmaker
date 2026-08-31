@@ -10,8 +10,8 @@ import { asText, headline, repParts, strengthLine } from "./text.js";
 import { platesFor } from "./plates.js";
 import { loadPref, savePref } from "./prefs.js";
 import {
-  daySeed, defaultWeekConfig, drawAccessory, editWeekDay, normaliseWeek, planWeek, presetsFor,
-  rowsForEnv, weekCount, weekSummary, withPreset,
+  changeEnv, daySeed, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, presetsFor,
+  redrawRows, weekCount, weekSummary, withPreset,
 } from "./planner.js";
 import WeekPlanner from "./WeekPlanner.jsx";
 
@@ -317,11 +317,28 @@ export default function App() {
     setCopied(false);
   };
 
+  /* Changing how many days you train keeps the ones you already set up. It
+     used to replace the whole week with defaults, so a hand-edited Monday was
+     destroyed by asking for a third session. */
+  /* Changing how many days you train keeps the ones you already set up. It used
+     to replace the whole week with defaults, so a hand-edited Monday was
+     destroyed by asking for a third session.
+
+     A day added by growing takes the latest free weekday the new schedule
+     offers, and shrinking drops from the end of the week, so growing and
+     shrinking back returns the week you had rather than keeping a day the app
+     added and cutting one you configured. */
   const changeCount = (next) => {
     const fresh = defaultWeekConfig(next, oneRM, weekSeed);
+    const merged = [...configs].sort((a, b) => a.weekday - b.weekday).slice(0, next);
+    const free = fresh.map((c) => c.weekday).filter((d) => !merged.some((c) => c.weekday === d));
+    while (merged.length < next && free.length) {
+      merged.push({ ...fresh[merged.length], weekday: free.pop() });
+    }
+    merged.sort((a, b) => a.weekday - b.weekday);
     setCount(next);
-    setConfigs(fresh);
-    setSelectedDay(fresh[0].weekday);
+    setConfigs(merged);
+    if (!merged.some((c) => c.weekday === selectedDay)) setSelectedDay(merged[0].weekday);
   };
 
   /* Redrawing one day moves that day's seed only. Locks are kept, the way
@@ -334,7 +351,8 @@ export default function App() {
     patchDay({
       nonce,
       swaps: [],
-      rows: [...splitRows(config.rows).lifts, ...drawAccessory(daySeed(weekSeed, index, nonce), config.env)],
+      held: config.locks,
+      rows: redrawRows(config, oneRM, daySeed(weekSeed, index, nonce)),
     });
   };
 
@@ -344,7 +362,9 @@ export default function App() {
     setWeekSeed(next);
     setConfigs((current) => current.map((c, i) => ({
       ...c,
-      rows: [...splitRows(c.rows).lifts, ...drawAccessory(daySeed(next, i, c.nonce), c.env)],
+      swaps: [],
+      held: c.locks,
+      rows: redrawRows(c, oneRM, daySeed(next, i, c.nonce)),
     })));
   };
 
@@ -364,7 +384,7 @@ export default function App() {
     : r)));
 
   // A shortcut swaps the barbell block and leaves the accessory work alone.
-  const applyPreset = (id) => patchDay({ preset: id, rows: withPreset(liftRows, id, oneRM) });
+  const applyPreset = (id) => setRows(withPreset(liftRows, id, oneRM));
 
   const isLocked = (moveId) => (config.locks || []).some((l) => l.moveId === moveId);
   const toggleLock = (moveId) => {
@@ -401,8 +421,11 @@ export default function App() {
     d.setDate(d.getDate() + ((config.weekday - d.getDay() + 7) % 7));
     return d.toISOString().slice(0, 10);
   }, [config.weekday]);
+  /* Copy feedback and a hand-picked date belong to the day they were set on,
+     so both are dropped when you look at a different one. */
   const [dateOverride, setDateOverride] = useState("");
   const useDate = dateOverride || date;
+  useEffect(() => { setDateOverride(""); setCopied(false); setCalOpen(false); }, [selectedDay]);
 
   const doCopy = async () => {
     try { await navigator.clipboard.writeText(text); }
@@ -495,10 +518,9 @@ export default function App() {
               <p className="lbl">{t.where}</p>
               <div className="chips">
                 {ENVS.map((e) => (
-                  <button key={e} className="chip" aria-pressed={env === e} onClick={() => patchDay({
-                      env: e,
-                      rows: rowsForEnv(config.preset, e, oneRM, daySeed(weekSeed, index, config.nonce)),
-                    })}>
+                  <button key={e} className="chip" aria-pressed={env === e} onClick={() => setConfigs((current) => current.map((c, i) => (
+                      i === index ? changeEnv(c, e, oneRM, daySeed(weekSeed, index, c.nonce)) : c
+                    )))}>
                     <b>{t[e]}</b><span>{t.whereHint[e]}</span>
                   </button>
                 ))}

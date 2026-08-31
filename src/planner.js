@@ -136,15 +136,29 @@ export function bestPresetFor(env) {
 /* A day's starting rows: the barbell shortcut for that slot if the place you
    are training has the equipment for it, plus an accessory block sized for
    what is left. Both are replaceable; this is only what you arrive to. */
+/* The budget covers the barbell block and the accessory block together, so
+   whatever the lifts already deliver is not asked of the accessories again.
+   Every path that draws a block goes through here: "Another" used to call
+   `drawAccessory` directly and hand a park day the whole budget on top of its
+   weighted pull-ups, which took the pre-conditioning work from 155 points to
+   269. */
+export function accessoryBudget(env, lifts, oneRM = {}) {
+  const total = PRE_BUDGET[env] ?? null;
+  if (total === null) return null;
+  const points = arrivingFromLifts(lifts.map((row) => ({ ...row, pct: pctFor(row, oneRM) }))).points;
+  return Math.max(0, total - points);
+}
+
 export function rowsForDay(preset, oneRM = {}, seed = 0, env = "gym") {
   const usable = presetsFor(env).includes(preset) ? preset : bestPresetFor(env);
   const lifts = rowsForPreset(usable, oneRM);
-  /* The budget covers the barbell block and the accessory block together, so
-     whatever the lifts already deliver is not asked of the accessories again. */
-  const total = PRE_BUDGET[env] ?? null;
-  const budget = total === null ? null
-    : Math.max(0, total - arrivingFromLifts(lifts.map((row) => ({ ...row, pct: pctFor(row, oneRM) }))).points);
-  return [...lifts, ...drawAccessory(seed, env, budget)];
+  return [...lifts, ...drawAccessory(seed, env, accessoryBudget(env, lifts, oneRM))];
+}
+
+/* Redraw a day's accessory block, keeping the barbell block it already has. */
+export function redrawRows(config, oneRM = {}, seed = 0) {
+  const { lifts } = splitRows(config.rows || []);
+  return [...lifts, ...drawAccessory(seed, config.env, accessoryBudget(config.env, lifts, oneRM))];
 }
 
 const rowKey = (row) => `${row.liftId || row.moveId}:${row.sets}x${row.reps}`;
@@ -177,8 +191,17 @@ export function withPreset(rows, id, oneRM = {}) {
    off the rows is what lets a squat day survive a trip to the park and come
    home again. The accessory draw is seeded on the day, so the gym block you
    come back to is the one you left. */
-export function rowsForEnv(preset, env, oneRM = {}, seed = 0) {
-  return rowsForDay(preset, oneRM, seed, env);
+export function changeEnv(config, env, oneRM = {}, seed = 0) {
+  if (env === config.env) return config;
+  /* The rows you authored are the stored fact, kept per place you train. What
+     a gym day holds cannot be done in a park, so it is set aside rather than
+     translated and translated back: coming home restores exactly what you
+     left, hand edits and all, and a block you cleared stays cleared. Deriving
+     it from a remembered "requested preset" instead meant an emptied day came
+     back full. */
+  const byEnv = { ...config.byEnv, [config.env]: config.rows };
+  const rows = byEnv[env] ?? rowsForDay(presetFor(config.rows), oneRM, seed, env);
+  return { ...config, env, rows, byEnv };
 }
 
 export function defaultWeekConfig(count = 2, oneRM = {}, seed = 0) {
@@ -187,9 +210,10 @@ export function defaultWeekConfig(count = 2, oneRM = {}, seed = 0) {
     weekday,
     env: "gym",
     intensity: "auto",
-    preset: FOCUS[safeCount][index],
+    byEnv: {},
     rows: rowsForDay(FOCUS[safeCount][index], oneRM, daySeed(seed, index), "gym"),
     locks: [],
+    held: [],
     swaps: [],
     nonce: 0,
   }));
@@ -199,21 +223,35 @@ const INTENSITY_IDS = new Set(["auto", ...INTENSITY.map((step) => step.id)]);
 
 /* A stored strength row is one of the two kinds the pricing model knows about,
    and nothing else gets through. */
+/* Bounds, not just signs. `Infinity > 0` is true, so a saved `1e309` used to
+   pass every check here and turn a day's total into Infinity and the next
+   day's into NaN, with the fault count still reading zero. */
+const bounded = (value, lo, hi) => {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
+};
+
 function cleanRows(rows) {
   if (!Array.isArray(rows)) return null;
-  return rows.map((row) => {
+  const cleaned = rows.map((row) => {
     const source = row?.moveId ? moveById(row.moveId) : liftById(row?.liftId);
     if (!source) return null;
-    const sets = Math.round(Number(row.sets));
-    const reps = Math.round(Number(row.reps));
-    if (!(sets > 0) || !(reps > 0)) return null;
+    const sets = bounded(Math.round(Number(row.sets)), 1, 20);
+    const reps = bounded(Math.round(Number(row.reps)), 1, 5000);
+    if (sets === null || reps === null) return null;
+    const kg = bounded(row.kg, 0, 500);
+    const pct = bounded(row.pct, 0.01, 2);
     return {
       ...(row.moveId ? { moveId: row.moveId } : { liftId: row.liftId }),
       sets, reps,
-      kg: Number(row.kg) > 0 ? Number(row.kg) : 0,
-      ...(row.pct > 0 ? { pct: Number(row.pct) } : {}),
+      kg: kg ?? 0,
+      ...(pct === null ? {} : { pct }),
     };
   }).filter(Boolean);
+  /* A saved block that cleans away to nothing is unusable rather than empty:
+     an empty array is truthy and used to win the fallback chain, so a day with
+     one unknown movement silently became conditioning-only. */
+  return rows.length > 0 && cleaned.length === 0 ? null : cleaned;
 }
 
 /* Swapping one movement is stored as an intent, not as a finished workout,
@@ -230,13 +268,22 @@ function cleanSwaps(swaps) {
 
 /* A lock keeps a movement across a redraw, and `buildCandidate` leaves a
    locked item's reps alone, so the rep count is part of the lock rather than
-   something to recompute. */
+   something to recompute.
+
+   `locks` is what you have ticked and `held` is what the current draw is
+   honouring. They have to be separate because a day is derived from its config
+   on every render: feeding `locks` straight into generation meant ticking one
+   changed the amount of the random stream the accepted candidate consumed, and
+   the whole session was redrawn under you. Measured over 600 seeds, that
+   reshaped the format or the movement list in 599 of them. Ticking now changes
+   nothing until "Another", which is what the daily card did before the week
+   planner absorbed it. */
 function cleanLocks(locks) {
   if (!Array.isArray(locks)) return [];
   return locks.map((lock) => {
     const move = moveById(lock?.moveId);
-    const reps = Number(lock?.reps);
-    return move && reps > 0 ? { moveId: lock.moveId, reps } : null;
+    const reps = bounded(lock?.reps, 1, 5000);
+    return move && reps !== null ? { moveId: lock.moveId, reps } : null;
   }).filter(Boolean);
 }
 
@@ -271,21 +318,22 @@ export function normaliseWeek(configs, count, { oneRM = {}, liftRows = null, see
       || fallback.rows;
     const nonce = Number(config?.nonce);
     const env = ENVS.includes(config?.env) ? config.env : fallback.env;
-    /* The block you asked for, kept even where it cannot be done, so leaving a
-       park restores what you had rather than what the park allowed. */
-    const preset = PRESET_ROWS[config?.preset] ? config.preset
-      : (config?.focus && PRESET_ROWS[config.focus]) ? config.focus
-        : presetFor(rows) === "custom" ? fallback.preset : presetFor(rows);
     /* A barbell row saved for a gym day is not something you can do in a park,
        so it does not survive being read back for one. */
     const usable = rows.filter((row) => rowAvailable(row, env));
+    const byEnv = {};
+    for (const key of ENVS) {
+      const saved = cleanRows(config?.byEnv?.[key]);
+      if (saved) byEnv[key] = saved.filter((row) => rowAvailable(row, key));
+    }
     return {
       weekday: Number.isInteger(weekday) && weekday >= 0 && weekday <= 6 ? weekday : fallback.weekday,
       env,
-      preset,
+      byEnv,
       intensity: INTENSITY_IDS.has(config?.intensity) ? config.intensity : fallback.intensity,
       rows: usable,
       locks: cleanLocks(config?.locks),
+      held: cleanLocks(config?.held),
       swaps: cleanSwaps(config?.swaps),
       nonce: Number.isFinite(nonce) ? nonce : 0,
     };
@@ -398,7 +446,7 @@ export function planWeek(configs, { seed = 1, oneRM = {} } = {}) {
     /* A lock names a movement and the reps it holds, because buildCandidate
        leaves a locked item's reps alone. Anything the environment cannot do is
        simply not locked. */
-    const locked = (config.locks || [])
+    const locked = (config.held || [])
       .map((lock) => ({ move: moveById(lock.moveId), reps: lock.reps }))
       .filter((item) => item.move);
     const chosen = chooseSession(config, {
@@ -427,7 +475,6 @@ export function planWeek(configs, { seed = 1, oneRM = {} } = {}) {
       requestedIntensity: config.intensity,
       intensity: chosen.intensity,
       preset: presetFor(strengthRows),
-      requestedPreset: config.preset,
       carry,
       carryPoints: Object.values(carry).reduce((sum, value) => sum + value, 0),
       seed: daySeed(seed, index, config.nonce),

@@ -502,7 +502,7 @@ So the block the app builds is drawn from the log's shape but not its frequency.
 
 The doses are the ones written in the log where a line is legible, 3x8 otherwise. An earlier attempt to report modal doses per movement was thrown away: the regex fell back to 3x8 so often that the "mode" was mostly the fallback reading itself back. Only a handful of lines give a dose unambiguously.
 
-Measured over 4000 draws against the log's own 28 accessory blocks: size 65/18/18 percent against 64/18/18, median cost 38 points against 43, mean 52 against 53. `npm run check:planner` pins the size range, that every drawn movement is one the log evidences, that the draw reproduces from its seed, and that the median block stays near the log's.
+Measured over 4000 draws against the log's own 28 accessory blocks: size 65/18/18 percent against 64/18/18, median cost 38 points. The source-side comparison that used to sit here has been withdrawn: it was computed in a script that was never committed, and the parser it relied on was wrong. See the review section below. `npm run check:planner` pins the size range, that every drawn movement is one the log evidences, that the draw reproduces from its seed, and that the median block stays near the log's.
 
 `drawAccessory()` never draws rowing or running, though both are offered in the grid. The log gives no evidence for them as accessory work, and inventing it to fill out a pool would be exactly the kind of fabricated default `CORPUS_DEFAULTS` exists to avoid.
 
@@ -548,8 +548,30 @@ None of them reach a park. Nobody carries dumbbells to a park, which is the whol
 
 The effect on the sweep, which is why `out/smoke-report.md` moves in this commit rather than staying identical:
 
-- **`nopull` fell from 31.2% of all sessions to 15.3%**, and at home specifically from 93.7% to 56.2%. Home went from no pulling movement at all to carrying one in 40.6% of sessions. The warning finally carries information there: it now tells you this particular session skipped pulling, which is something a swap can fix, rather than restating that the movement pool has a hole in it.
+- **`nopull` fell from 31.2% of all sessions to 15.3%**, and at home specifically from 93.5% to 45.8%, counted over the sweep's 2800 home workouts. Home went from no pulling movement at all to carrying one in 40.6% of sessions. The warning finally carries information there: it now tells you this particular session skipped pulling, which is something a swap can fix, rather than restating that the movement pool has a hole in it.
 - **The `traccion` axis share rose from 0.096 to 0.133** across all environments, since seven movements went from one pool to three.
 - **A home session went from a mean of 276 points to 287.** Hard faults stayed at zero.
 
 `npm run check:planner` pins both lists by name. The rule cannot be recovered from the `kg` string at run time, and a future data edit that quietly sends a 32 kg kettlebell home should fail rather than pass silently.
+
+## What an outside review found
+
+The branch was reviewed by the agent that wrote the week planner, given the commit range and the repo's own checks. Eight findings, all of which reproduced. They are recorded here because several were self-inflicted by the day-and-week merge and the pattern is worth not repeating.
+
+**Ticking a lock redrew the whole session.** The worst of them, and the one the review understated: it saw the behaviour once in a browser, and measured over 600 seeds it happens in 599. A day is derived from its config on every render, so putting `locks` into that config fed them straight into `generate()`. Locked items change a candidate's axis vector, that changes which candidates `faults()` rejects, and a different rejection count leaves the accepted candidate at a different point in the seeded stream. The button that exists to keep one movement was reliably replacing all of them.
+
+`config.locks` is now what you have ticked and `config.held` is what the current draw honours; "Another" promotes one into the other. That restores exactly what the daily card did before the merge, where a lock was an inert flag until you rerolled. Ticking now changes nothing: 0 of 600 seeds.
+
+The underlying drift is still there. Editing a lift by one rep changes the format or the movements in about 16% of seeds, for the same reason. `CLAUDE.md` used to call this "essentially never bites" on the grounds that the sweep finds zero hard faults in returned workouts, and that inference is simply wrong: zero faults in the *accepted* candidate says nothing about how many were rejected first. The deeper fix is to derive the session's shape from the seed alone and let load and effort scale only the reps, which would make the guarantee real. It was weighed and set aside, because the composition checks that reject candidates depend on the arriving load and turning them into warnings trades a rare invisible reshuffle for a common visible one.
+
+**An emptied strength block came back full.** Storing the requested preset alongside the rows looked like the `intensity`/`plan.intensity` pattern, but it is not the same thing: effort resolves to a step every time, whereas rows are authored. Rebuilding from the remembered preset discarded hand edits, and if you had cleared the block it rebuilt it from scratch. Rows are now kept per environment in `config.byEnv`, set aside when you leave a place and restored when you return, so a `5x7` survives a trip and a cleared block stays cleared.
+
+**Growing the week destroyed it.** `changeCount()` replaced every config with defaults, so asking for a third session threw away a hand-edited Monday. This one predates the merge, but the merge made it far more expensive by moving rows, locks and swaps onto the day.
+
+**`Infinity` is a positive number.** A stored lock of `1e309` passed `reps > 0`, produced a day total of `Infinity` and a next-day total of `NaN`, and the fault count still read zero. Everything saved now goes through a bounds check. In the same family: a saved block containing only unknown movements cleaned to an empty array, and an empty array is truthy, so it won the `|| fallback` chain and silently emptied the day. That is the same bug that had already been found and fixed once for the `focus` migration and not generalised.
+
+**Two redraw paths bypassed the budget.** `rowsForDay()` subtracts what the lifts deliver before drawing accessories; "Another" and "Another week" called `drawAccessory()` directly and did not, taking a park day's pre-conditioning work from 155 points to 269. There is now one function, `accessoryBudget()`, and both paths go through `redrawRows()`.
+
+**Smaller ones.** "Another week" left stale swap intents behind, which could fire dormant on a later week that happened to contain the old movement. Copy feedback and a hand-picked calendar date belonged to the whole app rather than to the day they were set on.
+
+**Two published numbers did not reproduce.** Home `nopull` was given as 93.7% to 56.2%; the sweep says 93.5% to 45.8%. The first figure came from an ad-hoc sample of one strength block, using a seed and a sample size that were never committed. The corpus block-cost median of 43 has been withdrawn entirely for the same reason, compounded by the parser fault described below. A number that cannot be regenerated from the repository should not be stated in it as fact.

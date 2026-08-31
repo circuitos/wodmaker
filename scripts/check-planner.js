@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import {
-  bestPresetFor, daySeed, defaultWeekConfig, drawAccessory, editWeekDay, normaliseWeek, planWeek,
-  presetFor, presetsFor, rowsForDay, rowsForEnv, rowsForPreset, targetFor, weekSummary, withPreset,
+  accessoryBudget, bestPresetFor, changeEnv, daySeed, defaultWeekConfig, drawAccessory, editWeekDay,
+  normaliseWeek, planWeek, presetFor, presetsFor, redrawRows, rowsForDay, rowsForPreset, targetFor,
+  weekSummary, withPreset,
 } from "../src/planner.js";
 import { sessionLoad } from "../src/generator.js";
 import { FORMATS } from "../src/formats.js";
@@ -106,11 +107,59 @@ for (const env of ["gym", "parque", "casa"]) {
 assert.deepEqual(presetsFor("casa"), ["none"], "a living room supports no barbell block");
 assert.equal(bestPresetFor("parque"), "pull", "a park keeps weighted pull-ups rather than nothing");
 
-const trip = ["parque", "casa", "gym"].reduce(
-  (rows, env) => rowsForEnv("lower", env, { back_squat: 130, rdl: 110 }, 7),
-  rowsForDay("lower", { back_squat: 130, rdl: 110 }, 7, "gym"),
-);
-assert.equal(presetFor(trip), "lower", "the gym block comes back after a trip to the park and home");
+/* The rows you authored are kept per place you train, so a trip away and back
+   returns exactly what you left, hand edits included, and a block you cleared
+   stays cleared rather than being rebuilt from a remembered preset. */
+const rm = { back_squat: 130, rdl: 110, weighted_pullup: 20 };
+const authored = [{ liftId: "back_squat", sets: 5, reps: 7, kg: 100, pct: 0.77 },
+  { moveId: "db_row", sets: 3, reps: 10, kg: 0 }];
+let trip = { weekday: 1, env: "gym", rows: authored, byEnv: {} };
+for (const env of ["parque", "casa", "gym"]) trip = changeEnv(trip, env, rm, 7);
+assert.deepEqual(trip.rows, authored, "a hand-edited gym block survives the round trip unchanged");
+
+let cleared = { weekday: 1, env: "gym", rows: [], byEnv: {} };
+for (const env of ["parque", "gym"]) cleared = changeEnv(cleared, env, rm, 7);
+assert.deepEqual(cleared.rows, [], "a cleared block is not resurrected by leaving and returning");
+
+/* Every path that redraws a block respects the joint budget. Feeding the whole
+   budget to the accessories on top of the lifts took a park day from 155 to
+   269 points of pre-conditioning work. */
+for (let seed = 1; seed <= 60; seed += 1) {
+  const rows = rowsForDay("pull", rm, seed, "parque");
+  const again = redrawRows({ env: "parque", rows }, rm, seed + 1);
+  for (const set of [rows, again]) {
+    const { lifts, accessory } = splitRows(set);
+    const budget = accessoryBudget("parque", lifts, rm);
+    const spent = accessory.reduce((sum, row) => sum + accessoryPoints(row), 0);
+    assert(spent <= budget + 100, `a park block should respect its budget, spent ${Math.round(spent)} against ${Math.round(budget)}`);
+  }
+}
+
+/* Ticking a lock marks a movement; it must not redraw the session under you. */
+const lockBase = normaliseWeek([{ weekday: 1, env: "gym", intensity: "normal" }], 1);
+const [plain] = planWeek(lockBase, { seed: 12 });
+const ticked = planWeek(lockBase.map((c) => (
+  { ...c, locks: [{ moveId: plain.items[0].move.id, reps: plain.items[0].reps }] })), { seed: 12 })[0];
+assert.equal(ticked.fmt.id, plain.fmt.id, "ticking a lock does not change the format");
+assert.deepEqual(ticked.items.map((i) => i.move.id), plain.items.map((i) => i.move.id),
+  "ticking a lock does not change the movements");
+const heldAfter = planWeek(lockBase.map((c) => (
+  { ...c, held: [{ moveId: plain.items[0].move.id, reps: plain.items[0].reps }], nonce: 1 })), { seed: 12 })[0];
+assert(heldAfter.items.some((i) => i.move.id === plain.items[0].move.id),
+  "and the movement is kept once the day is redrawn");
+
+/* Bounds, not just signs: a saved Infinity used to make a whole week NaN. */
+const poisoned = normaliseWeek([{ weekday: 1, env: "gym", locks: [{ moveId: "burpee", reps: Number.POSITIVE_INFINITY }] },
+  { weekday: 3, env: "gym" }], 2);
+assert.equal(poisoned[0].locks.length, 0, "an unbounded lock is not a lock");
+assert.equal(normaliseWeek([{ weekday: 1, env: "gym", rows: [{ liftId: "back_squat", sets: 3, reps: 5, kg: Number.POSITIVE_INFINITY }] }], 1)[0].rows[0].kg, 0,
+  "and an unbounded weight is not a weight");
+for (const wod of planWeek(poisoned, { seed: 1 })) {
+  assert(Number.isFinite(sessionLoad(wod).total), "every day's load stays a number");
+  assert(Number.isFinite(wod.plan.carryPoints), "and so does the carry into the next");
+}
+assert(normaliseWeek([{ weekday: 1, env: "gym", rows: [{ liftId: "unicorn", sets: 3, reps: 5 }] }], 1)[0].rows.length > 0,
+  "a saved block that cleans away to nothing falls back rather than emptying the day");
 
 /* Effort targets differ by environment, and each is reachable there. */
 assert(targetFor("gym") > targetFor("parque"), "a gym day is worth more than a park day");
@@ -180,8 +229,10 @@ assert.equal(edited[1].rows.find((row) => row.liftId === "back_squat").kg, 80,
 const base = normaliseWeek(null, 2);
 const [firstDay] = planWeek(base, { seed: 4242 });
 const keep = firstDay.items[0];
+/* `held`, not `locks`: a redraw is what promotes what you ticked into what the
+   draw honours. */
 const withLock = base.map((day, i) => (i === 0
-  ? { ...day, locks: [{ moveId: keep.move.id, reps: keep.reps }], nonce: 7 }
+  ? { ...day, held: [{ moveId: keep.move.id, reps: keep.reps }], nonce: 7 }
   : day));
 const [redrawn] = planWeek(withLock, { seed: 4242 });
 const held = redrawn.items.find((item) => item.move.id === keep.move.id);
