@@ -10,7 +10,8 @@ import { asText, headline, repParts, strengthLine } from "./text.js";
 import { platesFor } from "./plates.js";
 import { loadPref, savePref } from "./prefs.js";
 import {
-  defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, weekCount, weekSummary, withPreset,
+  daySeed, defaultWeekConfig, drawAccessory, editWeekDay, normaliseWeek, planWeek, weekCount,
+  weekSummary, withPreset,
 } from "./planner.js";
 import WeekPlanner from "./WeekPlanner.jsx";
 
@@ -180,14 +181,17 @@ const CSS = `
 .pct{font-size:11px;color:var(--ink-2);text-align:right}
 .warn{margin:14px 18px 0;border-left:3px solid var(--yellow);padding:8px 0 8px 11px;
   font-size:12.5px;color:var(--ink-2);line-height:1.45}
-.acts{display:flex;gap:8px;flex-wrap:wrap;padding:16px 18px 18px}
+/* The actions sit at the top of the card: they are the most-used part of
+   the app and should never be a scroll away. */
+.acts{display:flex;gap:8px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--rule);
+  background:#FAFAF7}
 .btn{border:1.5px solid var(--ink);background:transparent;border-radius:2px;padding:11px 15px;
   font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink);
   display:inline-flex;align-items:center;gap:7px}
 .btn:hover{background:#F1F0EB}
 .btn.pri{background:var(--ink);color:var(--board);flex:1 1 140px;justify-content:center}
 .btn.pri:hover{background:#000}
-.pop{margin:0 18px 18px;border:1.5px dashed var(--rule);border-radius:2px;padding:14px}
+.pop{margin:14px 18px;border:1.5px dashed var(--rule);border-radius:2px;padding:14px}
 .pop label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--ink-2);margin-bottom:5px}
 .pop input{width:100%;padding:9px;border:1.5px solid var(--ink);border-radius:2px;font:inherit;
@@ -275,11 +279,11 @@ export default function App() {
      and an index would then point at a different day than the one you were
      looking at. */
   const [count, setCount] = useState(() => weekCount(loadPref("weekCount", 2)));
+  const [weekSeed, setWeekSeed] = useState(() => loadPref("weekSeed", Math.floor(Math.random() * 2 ** 31)));
   const [configs, setConfigs] = useState(() => normaliseWeek(
     loadPref("weekConfigs", null), weekCount(loadPref("weekCount", 2)),
-    { oneRM: loadPref("oneRM", {}), liftRows: loadPref("liftRows", null) },
+    { oneRM: loadPref("oneRM", {}), liftRows: loadPref("liftRows", null), seed: weekSeed },
   ));
-  const [weekSeed, setWeekSeed] = useState(() => loadPref("weekSeed", Math.floor(Math.random() * 2 ** 31)));
   const [selectedDay, setSelectedDay] = useState(() => Number(loadPref("selectedDay", -1)));
 
   const [copied, setCopied] = useState(false);
@@ -314,7 +318,7 @@ export default function App() {
   };
 
   const changeCount = (next) => {
-    const fresh = defaultWeekConfig(next, oneRM);
+    const fresh = defaultWeekConfig(next, oneRM, weekSeed);
     setCount(next);
     setConfigs(fresh);
     setSelectedDay(fresh[0].weekday);
@@ -322,8 +326,27 @@ export default function App() {
 
   /* Redrawing one day moves that day's seed only. Locks are kept, the way
      "Another" always kept them; pending swaps are dropped, since they name
-     movements this draw may not contain. */
-  const another = () => patchDay({ nonce: (config.nonce || 0) + 1, swaps: [] });
+     movements this draw may not contain. The accessory block is redrawn with
+     the piece, since both are things the app suggests; the barbell block is
+     your programme and stays put. */
+  const another = () => {
+    const nonce = (config.nonce || 0) + 1;
+    patchDay({
+      nonce,
+      swaps: [],
+      rows: [...splitRows(config.rows).lifts, ...drawAccessory(daySeed(weekSeed, index, nonce))],
+    });
+  };
+
+  /* A different week redraws every day's accessory block too. */
+  const anotherWeek = () => {
+    const next = Math.floor(Math.random() * 2 ** 31);
+    setWeekSeed(next);
+    setConfigs((current) => current.map((c, i) => ({
+      ...c,
+      rows: [...splitRows(c.rows).lifts, ...drawAccessory(daySeed(next, i, c.nonce))],
+    })));
+  };
 
   const rowKey = (r) => r.liftId || r.moveId;
   const findRow = (id) => liftRows.find((r) => rowKey(r) === id);
@@ -450,7 +473,7 @@ export default function App() {
           <WeekPlanner
             lang={lang} oneRM={oneRM} plan={plan} configs={configs} count={count} summary={summary}
             onCount={changeCount} onPatchDay={patchDay}
-            onAnotherWeek={() => setWeekSeed(Math.floor(Math.random() * 2 ** 31))}
+            onAnotherWeek={anotherWeek}
             onOpenDay={(weekday) => { setSelectedDay(weekday); setView("day"); }}
           />
         ) : (
@@ -588,6 +611,27 @@ export default function App() {
 
           {wod && (
             <main className="card">
+              <div className="acts">
+                <button className="btn pri" onClick={another}><IconSwap /> {t.another}</button>
+                <button className="btn" onClick={doCopy}>{copied ? t.copied : t.copy}</button>
+                <button className="btn" onClick={doShare}>{t.share}</button>
+                <button className="btn" onClick={() => setCalOpen(!calOpen)}>{t.cal}</button>
+              </div>
+
+              {calOpen && (
+                <div className="pop">
+                  <div className="two">
+                    <div><label>{lang === "es" ? "Fecha" : "Date"}</label>
+                      <input type="date" value={useDate} onChange={(e) => setDateOverride(e.target.value)} /></div>
+                    <div><label>{lang === "es" ? "Hora" : "Time"}</label>
+                      <input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <a className="btn" href={icsHref} download="wod.ics">{t.download}</a>
+                    <a className="btn" href={gcalHref} target="_blank" rel="noreferrer">{t.gcal}</a>
+                  </div>
+                </div>
+              )}
               {/* The barbell work and the accessory work are two blocks of the
                   session, not one: what happens between the lifts and the
                   conditioning piece stands on its own. */}
@@ -676,27 +720,6 @@ export default function App() {
                 </div>
               )}
 
-              <div className="acts">
-                <button className="btn pri" onClick={another}><IconSwap /> {t.another}</button>
-                <button className="btn" onClick={doCopy}>{copied ? t.copied : t.copy}</button>
-                <button className="btn" onClick={doShare}>{t.share}</button>
-                <button className="btn" onClick={() => setCalOpen(!calOpen)}>{t.cal}</button>
-              </div>
-
-              {calOpen && (
-                <div className="pop">
-                  <div className="two">
-                    <div><label>{lang === "es" ? "Fecha" : "Date"}</label>
-                      <input type="date" value={useDate} onChange={(e) => setDateOverride(e.target.value)} /></div>
-                    <div><label>{lang === "es" ? "Hora" : "Time"}</label>
-                      <input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <a className="btn" href={icsHref} download="wod.ics">{t.download}</a>
-                    <a className="btn" href={gcalHref} target="_blank" rel="noreferrer">{t.gcal}</a>
-                  </div>
-                </div>
-              )}
             </main>
           )}
         </div>

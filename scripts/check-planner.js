@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import {
-  daySeed, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, presetFor, rowsForPreset,
-  weekSummary, withPreset,
+  daySeed, defaultWeekConfig, drawAccessory, editWeekDay, normaliseWeek, planWeek, presetFor,
+  rowsForPreset, weekSummary, withPreset,
 } from "../src/planner.js";
 import { sessionLoad } from "../src/generator.js";
 import { FORMATS } from "../src/formats.js";
 import { ladderRungs } from "../src/text.js";
-import { accessoryById, accessoryPoints, accessoryRepMax, moveById } from "../src/lifts.js";
+import { accessoryById, accessoryPoints, accessoryRepMax, moveById, splitRows } from "../src/lifts.js";
+import { CORPUS_DEFAULTS } from "../src/corpus.js";
 
 const shape = (plan) => plan.map((wod) => ({
   format: wod.fmt.id,
@@ -157,6 +158,40 @@ for (let seed = 1; seed <= 400; seed += 1) {
   }
 }
 assert(laddersChecked > 20, "the ladder sweep should see a useful number of ladders");
+
+/* Every day arrives with an accessory block already ticked, drawn the way the
+   source log writes one: one to three movements, weighted by how often each
+   appears, at the dose recorded next to it. The log's own zero case is not
+   drawn from, which is a product choice and is documented as one. */
+for (const count of [2, 3, 4, 5]) {
+  for (const day of defaultWeekConfig(count, {}, 4242)) {
+    const { lifts, accessory } = splitRows(day.rows);
+    assert(accessory.length >= 1 && accessory.length <= 3,
+      `a fresh day carries one to three accessory movements, got ${accessory.length}`);
+    assert.equal(new Set(accessory.map((row) => row.moveId)).size, accessory.length, "no repeats");
+    for (const row of accessory) {
+      assert(accessoryById(row.moveId), `${row.moveId} must be offered in the grid`);
+      assert(CORPUS_DEFAULTS.accessory.some((entry) => entry.moveId === row.moveId),
+        `${row.moveId} must be a movement the log evidences`);
+    }
+    assert(lifts.length > 0 || presetFor(day.rows) === "none", "the barbell block is unaffected");
+  }
+}
+
+/* The draw reproduces from its seed, and different seeds give different work. */
+assert.deepEqual(drawAccessory(99), drawAccessory(99), "the accessory draw is seeded");
+assert.notDeepEqual(drawAccessory(1), drawAccessory(2), "a different seed draws differently");
+
+/* Block cost stays in the range the log shows for its own accessory blocks:
+   20 at the first quartile, 43 median, 58 at the third. */
+const blockCosts = [];
+for (let seed = 1; seed <= 2000; seed += 1) {
+  blockCosts.push(drawAccessory(seed).reduce((sum, row) => sum + accessoryPoints(row), 0));
+}
+blockCosts.sort((a, b) => a - b);
+const median = blockCosts[blockCosts.length >> 1];
+assert(median > 20 && median < 70, `median accessory block should sit near the log's 43, got ${median}`);
+assert(blockCosts[blockCosts.length - 1] < 200, "and no block should dwarf the session it precedes");
 
 /* The barbell block and the accessory block are two parts of a session. A
    strength shortcut names the first and must leave the second alone. */

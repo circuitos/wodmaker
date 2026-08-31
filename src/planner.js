@@ -1,6 +1,6 @@
 import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, intensityK } from "./formats.js";
-import { generate, sessionAxisLoad, sessionLoad } from "./generator.js";
+import { generate, mulberry32, sessionAxisLoad, sessionLoad } from "./generator.js";
 import {
   PRESET_ROWS, arrivingFromAxis, arrivingFromLifts, liftById, moveById, pctFor, splitRows,
 } from "./lifts.js";
@@ -42,6 +42,45 @@ export function rowsForPreset(id, oneRM = {}) {
   }));
 }
 
+/* The accessory block, drawn the way the source log writes one.
+
+   Half the entries in the log are conditioning only, but a session here always
+   gets a block: that is a product choice, not a corpus frequency, so only the
+   non-zero sizes are drawn from. Within that, both the size (one movement most
+   often, never more than three) and which movements come up are weighted by
+   what the log actually contains, and each is written at the dose recorded
+   next to it. Machine and running work is offered in the grid but never drawn,
+   since the log gives no evidence for it as accessory work. */
+export function drawAccessory(seed = 0) {
+  const random = mulberry32(seed >>> 0);
+  const weighted = (items, weight) => {
+    const total = items.reduce((sum, item) => sum + weight(item), 0);
+    let r = random() * total;
+    for (const item of items) { r -= weight(item); if (r <= 0) return item; }
+    return items[items.length - 1];
+  };
+
+  const sizes = Object.entries(CORPUS_DEFAULTS.accessoryBlockSizes)
+    .map(([size, count]) => ({ size: Number(size), count }))
+    .filter((entry) => entry.size > 0);
+  const n = weighted(sizes, (entry) => entry.count).size;
+
+  const pool = [...CORPUS_DEFAULTS.accessory];
+  const picked = [];
+  while (picked.length < n && pool.length) {
+    const choice = weighted(pool, (item) => item.sessions);
+    pool.splice(pool.indexOf(choice), 1);
+    picked.push({ moveId: choice.moveId, sets: choice.sets, reps: choice.reps, kg: choice.kg });
+  }
+  return picked;
+}
+
+/* A day's starting rows: the barbell shortcut for that slot, plus an accessory
+   block. Both are replaceable; this is only what you arrive to. */
+export function rowsForDay(preset, oneRM = {}, seed = 0) {
+  return [...rowsForPreset(preset, oneRM), ...drawAccessory(seed)];
+}
+
 const rowKey = (row) => `${row.liftId || row.moveId}:${row.sets}x${row.reps}`;
 const rowsKey = (rows) => (rows || []).map(rowKey).sort().join("|");
 
@@ -62,13 +101,13 @@ export function withPreset(rows, id, oneRM = {}) {
   return [...rowsForPreset(id, oneRM), ...splitRows(rows).accessory];
 }
 
-export function defaultWeekConfig(count = 2, oneRM = {}) {
+export function defaultWeekConfig(count = 2, oneRM = {}, seed = 0) {
   const safeCount = weekCount(count);
   return SCHEDULES[safeCount].map((weekday, index) => ({
     weekday,
     env: "gym",
     intensity: "auto",
-    rows: rowsForPreset(FOCUS[safeCount][index], oneRM),
+    rows: rowsForDay(FOCUS[safeCount][index], oneRM, daySeed(seed, index)),
     locks: [],
     swaps: [],
     nonce: 0,
@@ -137,8 +176,8 @@ function orderWeek(configs) {
    focus id used to reach the generator, produce no candidate, and silently
    drop that day out of the week. Every field is checked against the list that
    owns it, falling back to the default for that slot. */
-export function normaliseWeek(configs, count, { oneRM = {}, liftRows = null } = {}) {
-  const defaults = defaultWeekConfig(count, oneRM);
+export function normaliseWeek(configs, count, { oneRM = {}, liftRows = null, seed = 0 } = {}) {
+  const defaults = defaultWeekConfig(count, oneRM, seed);
   return orderWeek(defaults.map((fallback, index) => {
     const config = Array.isArray(configs) ? configs[index] : null;
     const weekday = Number(config?.weekday);

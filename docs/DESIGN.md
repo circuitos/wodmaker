@@ -491,3 +491,23 @@ Also reported: a rower or a run is not only a conditioning movement. It sits bet
 What did need work was the grid, which assumed every accessory is counted in reps. The dose ceiling was a flat 60 and a new row was seeded at 3x8, which gives "3x8 m of rowing". `accessoryRepMax()` takes the ceiling from the movement's own prescribed dose, `defaultAccessoryRow()` seeds a distance, calorie or time piece as one set of that dose, and the row shows its unit. This also fixes a plank, which had been defaulting to 3x8 seconds since it was added.
 
 The warm-up stays unlogged, for the reason already recorded above: the calibration was fitted against whole sessions that included their warm-ups, so logging one would count it twice.
+
+## The accessory block arrives already chosen
+
+Splitting accessory work into its own block exposed that the merge had quietly dropped its default. The old daily view seeded `liftRows` from `CORPUS_DEFAULTS.accessory`, but a day's rows now come from `rowsForPreset()`, and `PRESET_ROWS` is main lifts only, for all seven shortcuts. So every fresh day arrived with an empty accessory block. That is a regression the merge introduced, not a decision.
+
+Filling it back in raised a factual question worth being straight about. The request was framed as "every one of the 55 sessions includes the accessory section", and the log does not say that. Counting the text before each conditioning marker, 28 of the 56 entries carry accessory work and 28 carry none; the empty ones are genuinely conditioning-only days, not a parsing failure. Of the 28 that do, 18 carry one movement, 5 carry two and 5 carry three.
+
+So the block the app builds is drawn from the log's shape but not its frequency. `drawAccessory()` weights the block size by 18/5/5 and the movements by how often each appears, and simply excludes the zero case. Always having a block is a product choice, and `CLAUDE.md` and `src/corpus.js` both say so rather than dressing it as a corpus fact.
+
+The doses are the ones written in the log where a line is legible, 3x8 otherwise. An earlier attempt to report modal doses per movement was thrown away: the regex fell back to 3x8 so often that the "mode" was mostly the fallback reading itself back. Only a handful of lines give a dose unambiguously.
+
+Measured over 4000 draws against the log's own 28 accessory blocks: size 65/18/18 percent against 64/18/18, median cost 38 points against 43, mean 52 against 53. `npm run check:planner` pins the size range, that every drawn movement is one the log evidences, that the draw reproduces from its seed, and that the median block stays near the log's.
+
+`drawAccessory()` never draws rowing or running, though both are offered in the grid. The log gives no evidence for them as accessory work, and inventing it to fill out a pool would be exactly the kind of fabricated default `CORPUS_DEFAULTS` exists to avoid.
+
+"Another" redraws the accessory block with the conditioning piece; "Another week" redraws every day's. The barbell block is untouched by both, because it is your programme rather than something the app suggests.
+
+## The actions moved to the top of the card
+
+They were below the axis meter, which on a phone put the buttons a full screen of scrolling below the workout. They are the most-used part of the app: "Another" is how you use the generator at all, and Copy is how the session leaves it. The card now opens with them.

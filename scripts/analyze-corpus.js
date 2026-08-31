@@ -48,6 +48,17 @@ const accessorySessions = Object.fromEntries(Object.entries(accessoryPatterns).m
   beforeConditioning.filter((entry) => pattern.test(entry)).length,
 ]));
 
+/* How many accessory movements a session carries, counted only over the text
+   before the conditioning marker. Half the entries have none: they are
+   conditioning-only days. The rest carry one to three. */
+const accessoryCounts = beforeConditioning.map(
+  (entry) => Object.values(accessoryPatterns).filter((pattern) => pattern.test(entry)).length,
+);
+const accessoryBlockSizes = accessoryCounts.reduce((tally, count) => {
+  tally[count] = (tally[count] || 0) + 1;
+  return tally;
+}, {});
+
 const sortedGaps = dates.slice(1).map((date, index) => (
   (Date.parse(date) - Date.parse(dates[index])) / 86_400_000
 )).sort((a, b) => a - b);
@@ -61,6 +72,8 @@ const summary = {
   medianGapDays: sortedGaps[Math.floor(sortedGaps.length / 2)],
   weekdayCounts,
   accessorySessions,
+  accessoryBlockSizes,
+  sessionsWithAccessory: accessoryCounts.filter((count) => count > 0).length,
 };
 
 console.log(JSON.stringify(summary, null, 2));
