@@ -44,7 +44,13 @@ Every movement declares how its effort splits across `piernas` (legs), `posterio
 wodmaker/
 ├── index.html                  # Vite entry document
 ├── src/
-│   ├── App.jsx                 # the app: database, generator, rendering, UI
+│   ├── moves.js                # the movement database and the six axes
+│   ├── formats.js              # workout formats, strength blocks, cues
+│   ├── i18n.js                 # every string the interface renders
+│   ├── generator.js            # candidate building and fault scoring
+│   ├── text.js                 # rep lines and plain-text export
+│   ├── plates.js               # barbell plate maths
+│   ├── App.jsx                 # the interface
 │   ├── main.jsx                # React root
 │   └── index.css               # global reset (app styles live in App.jsx)
 ├── public/
@@ -68,11 +74,11 @@ wodmaker/
 └── README.md
 ```
 
-`src/App.jsx` is one file in five numbered sections: database, formats, generator, rendering, app. The section headers are the map.
+The model (`moves.js` through `plates.js`) is plain JavaScript with no React in it, so it runs under Node as well as in the browser. `App.jsx` is the interface and the only file that imports React.
 
 ## Contributing
 
-The movement table is the actual content. To add a movement, add an entry to `MOVES` in `src/App.jsx` section 1:
+The movement table is the actual content. To add a movement, add an entry to `MOVES` in `src/moves.js`:
 
 ```js
 { id: "wall_ball", es: "wall balls", en: "wall balls", pat: "full",

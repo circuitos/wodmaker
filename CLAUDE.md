@@ -11,14 +11,16 @@ One owner per fact: link, don't restate.
 | Pitch, quick start, project layout | `README.md` |
 | Architecture and tuning decisions, the load model | `docs/DESIGN.md` |
 | GitHub + Pages setup, troubleshooting | `docs/SETUP.md` |
-| The movement database (`MOVES`) | `src/App.jsx` section 1 |
-| Workout formats, strength blocks, cues, UI copy (`T`) | `src/App.jsx` section 2 |
-| Candidate building, fault scoring, quantisation | `src/App.jsx` section 3 |
-| Rep lines, plain-text export, barbell plate maths | `src/App.jsx` section 4 |
-| Styles (`CSS`), form wiring, calendar export | `src/App.jsx` section 5 |
+| The movement database (`MOVES`), the six axes | `src/moves.js` |
+| Workout formats, strength blocks, coaching cues | `src/formats.js` |
+| Every string the interface renders (`T`) | `src/i18n.js` |
+| Candidate building, fault scoring, quantisation | `src/generator.js` |
+| Rep lines and the plain-text export | `src/text.js` |
+| Barbell plate maths | `src/plates.js` |
+| Styles (`CSS`), form wiring, calendar export | `src/App.jsx` |
 | Pages site composition (root + branch previews) | `scripts/build-preview-site.mjs` |
 
-`src/App.jsx` is one file split into five numbered sections. Read the section header before editing; the numbering is the map.
+The model is plain JavaScript with no React in it, so `node --input-type=module -e 'import { generate } from "./src/generator.js"; ...'` works and `scripts/smoke.js` can import it. Keep it that way: nothing under `moves.js`, `formats.js`, `generator.js`, `text.js` or `plates.js` should import React.
 
 ### Hierarchy of truth
 1. **Data wins.** `MOVES` is the actual content. Which movement can appear where, at what dose, and at what metabolic cost is decided there, not in prose.
@@ -31,10 +33,10 @@ A new feature lands as part of the app, not beside it. Before writing code, work
 
 Run this check before implementing:
 
-1. **Does the app already half-model this?** Extend what is there instead of standing up a parallel version. Two representations of one idea is the failure mode, and there is already an example: `volumeBand()` sets a per-round volume target in section 3, `dayWork` re-derives a session total in section 5, and neither knows the other exists.
+1. **Does the app already half-model this?** Extend what is there instead of standing up a parallel version. Two representations of one idea is the failure mode, and there is already an example: `volumeBand()` sets a per-round volume target in `generator.js`, `dayWork` re-derives a session total in `App.jsx`, and neither knows the other exists.
 2. **What does it make redundant?** A new capability often replaces an older decision that only made sense in its absence. Retire the old thing in the same change. Keeping both is how the interface silts up.
 3. **Where does it live on screen?** Every control competes for one screen and one reader's attention. If a new control has no natural home, the layout wants rethinking rather than another row of buttons.
-4. **Does it need groundwork that doesn't exist yet?** Splitting `App.jsx`, extracting a module, reworking the form flow, or changing the shape of a `MOVES` entry are all legitimate prerequisites. Land them as their own commit first, then add the feature onto a structure that fits it.
+4. **Does it need groundwork that doesn't exist yet?** Extracting a module, reworking the form flow, or changing the shape of a `MOVES` entry are all legitimate prerequisites. Land them as their own commit first, then add the feature onto a structure that fits it.
 
 Say the restructuring out loud before starting: what moves, what breaks, what it costs, and what stops being supported. A plan is cheap to argue with; a merged refactor is not.
 

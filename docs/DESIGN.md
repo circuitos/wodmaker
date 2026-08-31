@@ -19,11 +19,11 @@ The app works out both numbers. It works them out in two different places that d
 
 ## Where the two numbers live
 
-| Code | Section | What it decides |
+| Code | Lives in | What it decides |
 |---|---|---|
-| `volumeBand()` | 3 | how many points one round should be |
-| `buildCandidate()` | 3 | scales the rep counts until the round hits that |
-| `dayWork` | 5 | guesses how many rounds there are, multiplies, adds the strength block |
+| `volumeBand()` | `generator.js` | how many points one round should be |
+| `buildCandidate()` | `generator.js` | scales the rep counts until the round hits that |
+| `dayWork` | `App.jsx` | guesses how many rounds there are, multiplies, adds the strength block |
 
 ## Problem 1: the same fact is written down twice
 
@@ -33,7 +33,7 @@ Take a 10-minute AMRAP.
 - `dayWork` assumes you get through 5 rounds.
 - 41 × 5 = 205 points, which is about 10 hard minutes.
 
-The answer is right. A 10-minute AMRAP should be about 10 minutes of work. But that "should" is written down nowhere. It exists only as 41 in section 3 multiplied by 5 in section 5, and nothing checks that the two still line up. Change the 41 and nobody changes the 5, and the app quietly starts lying about how hard the session was.
+The answer is right. A 10-minute AMRAP should be about 10 minutes of work. But that "should" is written down nowhere. It exists only as 41 in `generator.js` multiplied by 5 in `App.jsx`, and nothing checks that the two still line up. Change the 41 and nobody changes the 5, and the app quietly starts lying about how hard the session was.
 
 ## Problem 2: the format decides how hard your session is, and you do not pick the format
 
@@ -59,7 +59,7 @@ That settles what kind of control this can be. A control that promised an absolu
 
 In the generator, `dampen` shrinks the workout because you are already tired. In the display, `pre * 0.9` adds the strength work into your total for the day.
 
-Both are fair. A hard squat session should mean less conditioning afterwards, and it should also count as work you did. But one lives in section 3 and one in section 5, and neither knows the other exists.
+Both are fair. A hard squat session should mean less conditioning afterwards, and it should also count as work you did. But one lives in `generator.js` and one in `App.jsx`, and neither knows the other exists.
 
 Worth writing down, because it looks like it should be simple and is not: **`dampen` cannot be calculated from how much the strength block loaded you.** Squat and pull both load 140 points. Squat cuts the following workout by 15%, pull cuts it by 8%. Nearly double the cut for the same load, because legs take more out of you than arms do. That difference is real and it lives only in those seven hand-tuned numbers, so `dampen` stays as authored data.
 
@@ -67,7 +67,7 @@ Worth writing down, because it looks like it should be simple and is not: **`dam
 
 - `volumeBand` returns a range, `[lo, hi]`, and the only thing done with it is take the middle. It should be one number.
 - The EMOM line inside `dayWork` is `cap / items.length * (items.length === 3 ? 3 : items.length)`. Whatever `items.length` is, that works out to `cap`. It is the leftover of somebody adjusting a number until the output looked right.
-- `dayWork` is one expression with five nested ternaries, and it is the only thing in section 5 that knows anything about how formats work.
+- `dayWork` is one expression with five nested ternaries, and it is the only thing in `App.jsx` that knows anything about how formats work.
 
 ## The fix
 
@@ -91,7 +91,7 @@ sessionLoad(c) = { conditioning: c.totalWork * c.fmt.passes(c),
                    total:        conditioning + strength }
 ```
 
-Same two numbers, used twice. Change `load` and the target and the display move together, because there is only one number to change. Section 5 stops knowing what a format is.
+Same two numbers, used twice. Change `load` and the target and the display move together, because there is only one number to change. `App.jsx` stops knowing what a format is.
 
 `intensity` is a multiplier that sits at 1 and does nothing. It is there so the control has somewhere to plug in later.
 
@@ -119,9 +119,9 @@ There is one more thing the planner needs, and it is cheap to design for now. `S
 
 Four commits. Two of them exist only so we can tell whether the third one broke anything.
 
-**1. Split `src/App.jsx`.** A Node script cannot import the generator while it lives inside a React component file. Move sections 1 to 4 into `moves.js`, `formats.js`, `generator.js` and `text.js`, and leave section 5 as the component. Move the code, do not edit it, so the diff reads as cut and paste.
+**1. Split `src/App.jsx`. Done.** A Node script could not import the generator while it lived inside a React component file. Sections 1 to 4 are now `moves.js`, `formats.js`, `i18n.js`, `generator.js`, `text.js` and `plates.js`; `App.jsx` is the interface and the only file importing React. The code was cut by line range rather than retyped, so the diff is a move.
 
-This is a big diff, and it kills the "one file, five numbered sections" map that `CLAUDE.md` and `README.md` both describe. Both get rewritten in the same commit.
+The "one file, five numbered sections" map in `CLAUDE.md` and `README.md` died with it, and both were rewritten in the same commit.
 
 **2. Add `scripts/smoke.js`.** Generate a few thousand workouts covering every combination of settings and write down what came out: average and spread of session points per format, how the axis shares fall, how often each warning fires. Add `npm run smoke`, run it, commit the numbers.
 
