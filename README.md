@@ -27,9 +27,13 @@ The live site is auto-deployed from the default branch. Every other branch gets 
 6. The candidate is scored against a fault list: no axis over its share of the total work, a tighter cap on whatever the strength block already hammered, a ceiling on stacked skill and joint impact, plus soft warnings for grip-heavy and pull-free sessions. The generator draws up to 300 candidates and returns the first clean one, or the least-faulty one it saw.
 7. The result renders with per-movement rep lines, a load breakdown across the six axes, a coaching cue, barbell plate loading for gym sessions, and any warnings that survived.
 
-The **Week** view uses the same generator rather than a second workout model. It plans 2–5 sessions, carries each day's six-axis load into the next training day with calendar-day decay, avoids repeating the previous format and movements, and keeps one seed per week so edits change volume without reshuffling everything. Each day's weekday is a control in the card heading, and the week re-sorts itself when you move one, because the gap between two days is exactly what the carry-over decays over. Its default Monday/Wednesday cadence comes from the source log. Each day can choose a strength focus, environment, and either an explicit effort or `auto`, which selects the soft/normal/hard result closest to the shared daily-load target.
+The app has one model and two views of it. A week is a list of days, and a day carries everything about a session: which weekday, where you train, how hard, the strength block, and anything you locked.
 
-Anything you like, you can lock; anything you don't, you can swap for another movement in the same slot category without rerolling the whole workout.
+The **Day** view is an editor for one day of that week, with a switcher across the top. Everything on it writes to that day: change where you train, tick a lift, lock a movement you like, swap one you don't, or press "Another" to redraw just that day. Because the day belongs to a week, it already arrives with the fatigue carried from the days before it.
+
+The **Week** view is the overview of the same days: the weekly load, the balance across the six axes, and a card per day. "Edit day" opens that day in the Day view. Nothing is generated twice, so the first day of the week and the Day view are the same session, down to the reps.
+
+It plans 2–5 sessions, carries each day's six-axis load into the next training day with calendar-day decay, avoids repeating the previous format and movements, and keeps one seed per week so edits change volume without reshuffling everything. Each day's weekday is a control in the card heading, and the week re-sorts itself when you move one, because the gap between two days is exactly what the carry-over decays over. Its default Monday/Wednesday cadence comes from the source log. Effort can be an explicit soft/normal/hard or `auto`, which picks the result closest to the shared daily-load target.
 
 ## Exports
 
@@ -57,9 +61,9 @@ wodmaker/
 │   ├── plates.js               # barbell plate maths
 │   ├── prefs.js                # the few choices that survive a reload
 │   ├── corpus.js               # reproducible defaults derived from the source log
-│   ├── planner.js              # week generation, carry-over, automatic effort
-│   ├── WeekPlanner.jsx         # the week-planner interface
-│   ├── App.jsx                 # the interface
+│   ├── planner.js              # the week model: days, carry-over, automatic effort
+│   ├── WeekPlanner.jsx         # the week overview
+│   ├── App.jsx                 # the week state, the day editor, the styles
 │   ├── main.jsx                # React root
 │   └── index.css               # global reset (app styles live in App.jsx)
 ├── public/

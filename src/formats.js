@@ -90,3 +90,11 @@ export const CUES = {
     quality: ["Quality over speed.", "No rush; control every rep."],
   },
 };
+
+/* Which cue a session shows. Derived from the session's own seed rather than
+   drawn at render time, so the line holds still while you edit the day and
+   the card, the copied text and the week overview all quote the same one. */
+export function cueFor(wod, lang) {
+  const cues = CUES[lang][wod.fmt.id];
+  return cues[(wod.plan?.seed ?? 0) % cues.length];
+}

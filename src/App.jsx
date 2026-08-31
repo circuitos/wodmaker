@@ -1,13 +1,15 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { AXES, ENVS } from "./moves.js";
-import { CUES, INTENSITY, STRENGTH, intensityK } from "./formats.js";
-import { ACCESSORY, LIFTS, PRESET_ROWS, arrivingFromLifts, moveById, pctFor } from "./lifts.js";
+import { INTENSITY, STRENGTH, cueFor } from "./formats.js";
+import { ACCESSORY, LIFTS, moveById, pctFor } from "./lifts.js";
 import { T } from "./i18n.js";
-import { generate, pick, sessionLoad } from "./generator.js";
+import { sessionLoad } from "./generator.js";
 import { asText, headline, repParts, strengthLine } from "./text.js";
 import { platesFor } from "./plates.js";
 import { loadPref, savePref } from "./prefs.js";
-import { CORPUS_DEFAULTS } from "./corpus.js";
+import {
+  defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, rowsForPreset, weekCount, weekSummary,
+} from "./planner.js";
 import WeekPlanner from "./WeekPlanner.jsx";
 
 /* ------------------------------------------------------------------ *
@@ -178,6 +180,15 @@ const CSS = `
 a.btn{text-decoration:none}
 button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
   outline:2px solid var(--blue);outline-offset:2px}
+.dayswitch{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:0 0 18px}
+.dayswitch button{border:1px solid var(--rule);background:#fff;color:var(--ink-2);padding:6px 13px;
+  font:inherit;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.dayswitch button[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--board)}
+.dayswitch-load{margin-left:auto;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.autonote{margin:6px 0 0;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.day-open{margin-left:auto;border:0;background:transparent;color:var(--red);font:inherit;font-size:10.5px;
+  font-weight:700;letter-spacing:.09em;text-transform:uppercase;cursor:pointer;padding:0}
+.day-open:hover{text-decoration:underline}
 .week{display:grid;gap:18px}
 .week-intro,.week-controls{display:flex;align-items:flex-end;justify-content:space-between;gap:18px}
 .week-note{max-width:620px;margin:3px 0 0;color:var(--ink-2);font-size:13px;line-height:1.45}
@@ -233,94 +244,103 @@ const IconSwap = () => (
 
 export default function App() {
   const [lang, setLang] = useState(() => loadPref("lang", "es"));
-  const [view, setView] = useState(() => loadPref("view", "today"));
+  const [view, setView] = useState(() => (loadPref("view", "day") === "week" ? "week" : "day"));
   const [meterOpen, setMeterOpen] = useState(() => loadPref("meterOpen", true));
-  const [intensity, setIntensity] = useState(() => loadPref("intensity", "normal"));
-  const [env, setEnv] = useState("gym");
-  /* What you lifted before this: one row per ticked lift. `kg` is what you put
-     on the bar; `pct` only carries a preset's intent when no 1RM is on file to
-     turn it into kilos. */
-  /* The source dump is now checked in. Its before-conditioning blocks most
-     often contain split-squat/lunge work, then dumbbell rows. The doses below
-     are the corpus modes, and still apply only when no preference was saved. */
-  const DEFAULT_ACCESSORY = CORPUS_DEFAULTS.accessory.map(({ moveId, sets, reps, kg }) => ({ moveId, sets, reps, kg }));
-  const [liftRows, setLiftRows] = useState(() => loadPref("liftRows", DEFAULT_ACCESSORY));
-  /* One-rep maxes are a fact about you, not about today, so they outlive the
-     session and the reload. */
+  /* A one-rep max is a fact about you rather than about a day, so it stays
+     here while everything else about a session lives on the day it belongs
+     to. */
   const [oneRM, setOneRM] = useState(() => loadPref("oneRM", {}));
-  const [wod, setWod] = useState(null);
-  const [locks, setLocks] = useState({});
+
+  /* The week is the model and the Day tab is an editor for one of its days,
+     so there is one set of configs and both views read and write it. A day is
+     addressed by its weekday, not its position: editing one re-sorts the week,
+     and an index would then point at a different day than the one you were
+     looking at. */
+  const [count, setCount] = useState(() => weekCount(loadPref("weekCount", 2)));
+  const [configs, setConfigs] = useState(() => normaliseWeek(
+    loadPref("weekConfigs", null), weekCount(loadPref("weekCount", 2)),
+    { oneRM: loadPref("oneRM", {}), liftRows: loadPref("liftRows", null) },
+  ));
+  const [weekSeed, setWeekSeed] = useState(() => loadPref("weekSeed", Math.floor(Math.random() * 2 ** 31)));
+  const [selectedDay, setSelectedDay] = useState(() => Number(loadPref("selectedDay", -1)));
+
   const [copied, setCopied] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("09:45");
-
-  /* The session's random seed. A new one is drawn only when something asks for
-     a genuinely new session (mount, changing where you train, "Another"). Any
-     other change, ticking a strength row, moving the soft/normal/hard chip,
-     reuses it: same seed plus the same env/arriving/intensity reproduces the
-     same format and the same movements (see generate() in generator.js), so
-     the card holds still and only its numbers respond. A ref rather than
-     state, since reading it never needs to trigger a render on its own. */
-  const seedRef = useRef(Math.floor(Math.random() * 2 ** 31));
-  const isFirstArriving = useRef(true);
 
   useEffect(() => { savePref("lang", lang); }, [lang]);
   useEffect(() => { savePref("view", view); }, [view]);
   useEffect(() => { savePref("meterOpen", meterOpen); }, [meterOpen]);
-  useEffect(() => { savePref("liftRows", liftRows); }, [liftRows]);
   useEffect(() => { savePref("oneRM", oneRM); }, [oneRM]);
-  useEffect(() => { savePref("intensity", intensity); }, [intensity]);
+  useEffect(() => { savePref("weekCount", count); }, [count]);
+  useEffect(() => { savePref("weekConfigs", configs); }, [configs]);
+  useEffect(() => { savePref("weekSeed", weekSeed); }, [weekSeed]);
+  useEffect(() => { savePref("selectedDay", selectedDay); }, [selectedDay]);
   const t = T[lang];
 
-  const arriving = useMemo(
-    () => arrivingFromLifts(liftRows.map((r) => ({ ...r, pct: pctFor(r, oneRM) }))),
-    // eslint-disable-next-line
-    [liftRows, oneRM]);
+  const plan = useMemo(() => planWeek(configs, { seed: weekSeed, oneRM }), [configs, weekSeed, oneRM]);
+  const summary = useMemo(() => weekSummary(plan), [plan]);
 
-  const rowKey = (r) => r.liftId || r.moveId;
-  const findRow = (id) => liftRows.find((r) => rowKey(r) === id);
+  // An unknown or stale weekday falls back to the first day of the week.
+  const index = Math.max(0, configs.findIndex((c) => c.weekday === selectedDay));
+  const config = configs[index];
+  const env = config.env;
+  const liftRows = config.rows;
+  const base = plan.find((w) => w.plan.index === index) || null;
+  const wod = useMemo(() => (base ? { ...base, cue: cueFor(base, lang) } : null), [base, lang]);
 
-  const toggleRow = (id, kind) => setLiftRows((rows) =>
-    rows.some((r) => rowKey(r) === id)
-      ? rows.filter((r) => rowKey(r) !== id)
-      : [...rows, kind === "lift"
-          ? { liftId: id, sets: 5, reps: 5, kg: 0, pct: undefined }
-          : { moveId: id, sets: 3, reps: 8, kg: 0 }]);
-
-  const editRow = (id, field, value) => setLiftRows((rows) =>
-    rows.map((r) => (rowKey(r) === id
-      ? { ...r, [field]: value === "" ? 0 : Number(value), ...(field === "kg" ? { pct: undefined } : {}) }
-      : r)));
-
-  const applyPreset = (id) => setLiftRows(
-    PRESET_ROWS[id].map((r) => ({ ...r, kg: oneRM[r.liftId] > 0 ? Math.round(oneRM[r.liftId] * r.pct) : 0 })));
-
-  const roll = (keepLocks = false, newSession = false) => {
-    if (newSession) seedRef.current = Math.floor(Math.random() * 2 ** 31);
-    const locked = keepLocks && wod ? wod.items.filter((it) => locks[it.move.id]) : [];
-    const c = generate(env, arriving, { locked, intensity: intensityK(intensity), seed: seedRef.current });
-    if (!c) return;
-    c.cue = pick(CUES[lang][c.fmt.id]);
-    c.strengthRows = liftRows;
-    c.oneRM = oneRM;
-    setWod(c);
-    if (!keepLocks) setLocks({});
+  const patchDay = (patch, at = index) => {
+    setConfigs((current) => editWeekDay(current, at, patch));
+    if (patch.weekday !== undefined && at === index) setSelectedDay(Number(patch.weekday));
     setCopied(false);
   };
 
-  // A genuinely new session: first mount, or a different place to train.
-  useEffect(() => { roll(false, true); /* eslint-disable-next-line */ }, [env]);
+  const changeCount = (next) => {
+    const fresh = defaultWeekConfig(next, oneRM);
+    setCount(next);
+    setConfigs(fresh);
+    setSelectedDay(fresh[0].weekday);
+  };
 
-  // The strength grid or the effort chip changed. Same session, same seed:
-  // reuse it so the format and movements hold still and only the numbers move.
-  // Skipped on mount, since the [env] effect above already rolled once.
-  useEffect(() => {
-    if (isFirstArriving.current) { isFirstArriving.current = false; return; }
-    roll(false, false);
-    // eslint-disable-next-line
-  }, [arriving, intensity]);
-  useEffect(() => { if (wod) setWod({ ...wod, cue: pick(CUES[lang][wod.fmt.id]) }); /* eslint-disable-next-line */ }, [lang]);
+  /* Redrawing one day moves that day's seed only. Locks are kept, the way
+     "Another" always kept them; pending swaps are dropped, since they name
+     movements this draw may not contain. */
+  const another = () => patchDay({ nonce: (config.nonce || 0) + 1, swaps: [] });
+
+  const rowKey = (r) => r.liftId || r.moveId;
+  const findRow = (id) => liftRows.find((r) => rowKey(r) === id);
+  const setRows = (rows) => patchDay({ rows });
+
+  const toggleRow = (id, kind) => setRows(
+    liftRows.some((r) => rowKey(r) === id)
+      ? liftRows.filter((r) => rowKey(r) !== id)
+      : [...liftRows, kind === "lift"
+          ? { liftId: id, sets: 5, reps: 5, kg: 0, pct: undefined }
+          : { moveId: id, sets: 3, reps: 8, kg: 0 }]);
+
+  const editRow = (id, field, value) => setRows(liftRows.map((r) => (rowKey(r) === id
+    ? { ...r, [field]: value === "" ? 0 : Number(value), ...(field === "kg" ? { pct: undefined } : {}) }
+    : r)));
+
+  const applyPreset = (id) => setRows(rowsForPreset(id, oneRM));
+
+  const isLocked = (moveId) => (config.locks || []).some((l) => l.moveId === moveId);
+  const toggleLock = (moveId) => {
+    const item = wod?.items.find((i) => i.move.id === moveId);
+    patchDay({
+      locks: isLocked(moveId)
+        ? config.locks.filter((l) => l.moveId !== moveId)
+        : [...(config.locks || []), { moveId, reps: item ? item.reps : 0 }],
+    });
+  };
+
+  /* A swap is stored rather than applied, because the day is rebuilt from its
+     config every render. Each one names the movement it replaces and carries
+     its own draw, so swapping the same slot twice gives two different answers.
+     See applySwaps() in planner.js. */
+  const swapOne = (moveId) => patchDay({
+    swaps: [...(config.swaps || []), { moveId, nonce: (config.swaps || []).length }],
+  });
 
   const text = useMemo(() => (wod ? asText(wod, lang, env) : ""), [wod, lang, env]);
 
@@ -330,6 +350,17 @@ export default function App() {
   }, [wod]);
 
   const dayWork = useMemo(() => (wod ? Math.round(sessionLoad(wod).total) : 0), [wod]);
+  const arriving = wod ? wod.strength : { pre: {}, points: 0 };
+
+  /* The calendar defaults to the next time this weekday comes round, since a
+     planned day is a day of the week rather than a date. */
+  const date = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + ((config.weekday - d.getDay() + 7) % 7));
+    return d.toISOString().slice(0, 10);
+  }, [config.weekday]);
+  const [dateOverride, setDateOverride] = useState("");
+  const useDate = dateOverride || date;
 
   const doCopy = async () => {
     try { await navigator.clipboard.writeText(text); }
@@ -348,36 +379,23 @@ export default function App() {
 
   const icsHref = useMemo(() => {
     if (!wod) return "";
-    const start = new Date(`${date}T${time}:00`);
+    const start = new Date(`${useDate}T${time}:00`);
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     const z = (d) => d.toISOString().replace(/[-:]|\.\d{3}/g, "");
-    const esc = (s) => s.replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+    const esc = (v) => v.replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
     const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//WOD Generator//ES", "BEGIN:VEVENT",
       `UID:${Date.now()}@wodgen`, `DTSTAMP:${z(new Date())}`, `DTSTART:${z(start)}`, `DTEND:${z(end)}`,
       `SUMMARY:${esc(headline(wod, lang))}`, `DESCRIPTION:${esc(text)}`, "END:VEVENT", "END:VCALENDAR"].join("\r\n");
     return "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
-  }, [wod, date, time, text, lang]);
+  }, [wod, useDate, time, text, lang]);
 
   const gcalHref = useMemo(() => {
     if (!wod) return "";
-    const start = new Date(`${date}T${time}:00`);
+    const start = new Date(`${useDate}T${time}:00`);
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     const z = (d) => d.toISOString().replace(/[-:]|\.\d{3}/g, "");
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(headline(wod, lang))}&dates=${z(start)}/${z(end)}&details=${encodeURIComponent(text)}`;
-  }, [wod, date, time, text, lang]);
-
-  const swapOne = (id) => {
-    const removed = wod.items.find((it) => it.move.id === id);
-    const keep = wod.items.filter((it) => it.move.id !== id);
-    const fixed = { fmt: wod.fmt, cap: wod.cap, rounds: wod.rounds, slots: [removed.move.pat] };
-    const swapSeed = Math.floor(Math.random() * 2 ** 31);
-    const c = generate(env, arriving, { locked: keep, fixed, intensity: intensityK(intensity), seed: swapSeed });
-    if (!c) return;
-    c.cue = wod.cue;
-    c.strengthRows = liftRows;
-    c.oneRM = oneRM;
-    setWod(c);
-  };
+  }, [wod, useDate, time, text, lang]);
 
   const warnList = useMemo(() => {
     if (!wod) return [];
@@ -405,20 +423,37 @@ export default function App() {
         </header>
 
         <nav className="viewtabs" aria-label={t.planner.title}>
-          <button aria-pressed={view === "today"} onClick={() => setView("today")}>{t.planner.today}</button>
+          <button aria-pressed={view === "day"} onClick={() => setView("day")}>{t.planner.today}</button>
           <button aria-pressed={view === "week"} onClick={() => setView("week")}>{t.planner.week}</button>
         </nav>
 
         {view === "week" ? (
-          <WeekPlanner lang={lang} oneRM={oneRM} />
+          <WeekPlanner
+            lang={lang} oneRM={oneRM} plan={plan} configs={configs} count={count} summary={summary}
+            onCount={changeCount} onPatchDay={patchDay}
+            onAnotherWeek={() => setWeekSeed(Math.floor(Math.random() * 2 ** 31))}
+            onOpenDay={(weekday) => { setSelectedDay(weekday); setView("day"); }}
+          />
         ) : (
+        <>
+        {/* The Day tab is one day of the week, so switching days is how you
+            work through it rather than a separate idea. */}
+        <div className="dayswitch" role="tablist" aria-label={t.planner.weekday}>
+          {configs.map((c, i) => (
+            <button key={c.weekday} role="tab" aria-selected={i === index}
+              onClick={() => setSelectedDay(c.weekday)}>
+              {t.planner.weekdays[c.weekday]}
+            </button>
+          ))}
+          <span className="dayswitch-load mono">{t.planner.weeklyLoad} {Math.round(summary.total)}</span>
+        </div>
         <div className="grid">
           <aside>
             <div className="block">
               <p className="lbl">{t.where}</p>
               <div className="chips">
                 {ENVS.map((e) => (
-                  <button key={e} className="chip" aria-pressed={env === e} onClick={() => setEnv(e)}>
+                  <button key={e} className="chip" aria-pressed={env === e} onClick={() => patchDay({ env: e })}>
                     <b>{t[e]}</b><span>{t.whereHint[e]}</span>
                   </button>
                 ))}
@@ -427,11 +462,16 @@ export default function App() {
             <div className="block">
               <p className="lbl">{t.effort}</p>
               <div className="seg">
+                <button aria-pressed={config.intensity === "auto"}
+                  onClick={() => patchDay({ intensity: "auto" })}>{t.planner.auto}</button>
                 {INTENSITY.map((i) => (
-                  <button key={i.id} aria-pressed={intensity === i.id}
-                    onClick={() => setIntensity(i.id)}>{t.intensity[i.id]}</button>
+                  <button key={i.id} aria-pressed={config.intensity === i.id}
+                    onClick={() => patchDay({ intensity: i.id })}>{t.intensity[i.id]}</button>
                 ))}
               </div>
+              {config.intensity === "auto" && wod && (
+                <p className="autonote">{t.planner.auto} → {t.intensity[wod.plan.intensity]}</p>
+              )}
             </div>
             <div className="block">
               <p className="lbl">{t.before}</p>
@@ -518,7 +558,7 @@ export default function App() {
                 <p className="ltotal">
                   <span className="lbl" style={{ margin: 0 }}>{t.strengthTotal}</span>
                   <span className="mono">{Math.round(arriving.points)}</span>
-                  <button className="mtoggle disp" onClick={() => setLiftRows([])}>{t.clearLifts}</button>
+                  <button className="mtoggle disp" onClick={() => setRows([])}>{t.clearLifts}</button>
                 </p>
               )}
             </div>
@@ -557,9 +597,9 @@ export default function App() {
                       {part.kg && <em> · {part.kg}</em>}
                     </span>
                     <button className="ico" title={t.swap} onClick={() => swapOne(it.move.id)}><IconSwap /></button>
-                    <button className="ico" title={t.lock} aria-pressed={!!locks[it.move.id]}
-                      onClick={() => setLocks({ ...locks, [it.move.id]: !locks[it.move.id] })}>
-                      <IconLock on={!!locks[it.move.id]} />
+                    <button className="ico" title={t.lock} aria-pressed={isLocked(it.move.id)}
+                      onClick={() => toggleLock(it.move.id)}>
+                      <IconLock on={isLocked(it.move.id)} />
                     </button>
                   </div>
                   );
@@ -607,7 +647,7 @@ export default function App() {
               )}
 
               <div className="acts">
-                <button className="btn pri" onClick={() => roll(true, true)}><IconSwap /> {t.another}</button>
+                <button className="btn pri" onClick={another}><IconSwap /> {t.another}</button>
                 <button className="btn" onClick={doCopy}>{copied ? t.copied : t.copy}</button>
                 <button className="btn" onClick={doShare}>{t.share}</button>
                 <button className="btn" onClick={() => setCalOpen(!calOpen)}>{t.cal}</button>
@@ -617,7 +657,7 @@ export default function App() {
                 <div className="pop">
                   <div className="two">
                     <div><label>{lang === "es" ? "Fecha" : "Date"}</label>
-                      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+                      <input type="date" value={useDate} onChange={(e) => setDateOverride(e.target.value)} /></div>
                     <div><label>{lang === "es" ? "Hora" : "Time"}</label>
                       <input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
                   </div>
@@ -630,6 +670,7 @@ export default function App() {
             </main>
           )}
         </div>
+        </>
         )}
       </div>
     </div>

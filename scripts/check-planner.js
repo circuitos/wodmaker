@@ -64,7 +64,7 @@ for (const count of [2, 3, 4, 5]) {
   assert.deepEqual(weekdays, [...weekdays].sort((a, b) => a - b), "a week is stored in calendar order");
 }
 
-const moved = editWeekDay(defaultWeekConfig(3), 2, "weekday", 2);
+const moved = editWeekDay(defaultWeekConfig(3), 2, { weekday: 2 });
 assert.deepEqual(moved.map((day) => day.weekday), [1, 2, 3], "moving a day re-sorts the week");
 assert.equal(presetFor(moved[1].rows), "deadlift", "the moved day keeps its own strength rows");
 
@@ -80,7 +80,7 @@ for (const wod of partial) {
 
 /* A day owns its strength rows, so editing one day must not touch another. */
 const perDay = normaliseWeek(null, 3);
-const edited = editWeekDay(perDay, 1, "rows", rowsForPreset("full", { back_squat: 100 }));
+const edited = editWeekDay(perDay, 1, { rows: rowsForPreset("full", { back_squat: 100 }) });
 assert.equal(presetFor(edited[1].rows), "full", "the edited day takes the new rows");
 assert.equal(presetFor(edited[0].rows), presetFor(perDay[0].rows), "other days keep theirs");
 assert.equal(presetFor(edited[2].rows), presetFor(perDay[2].rows));
@@ -106,4 +106,28 @@ const untouched = planWeek(base, { seed: 4242 });
 const after = planWeek(base.map((day, i) => (i === 1 ? { ...day, nonce: 3 } : day)), { seed: 4242 });
 assert.deepEqual(shape([after[0]]), shape([untouched[0]]), "an earlier day holds still");
 
-console.log("Planner check passed for deterministic 2, 3, 4, and 5-day weeks.");
+/* A swap redraws one slot inside the shape the day already has, and never
+   hands back the movement it was asked to replace. */
+let swapsTested = 0;
+for (let seed = 1; seed <= 40; seed += 1) {
+  const week = normaliseWeek(null, 2);
+  const [before] = planWeek(week, { seed });
+  for (const item of before.items) {
+    const after = planWeek(
+      week.map((day, i) => (i === 0 ? { ...day, swaps: [{ moveId: item.move.id, nonce: 0 }] } : day)),
+      { seed },
+    )[0];
+    swapsTested += 1;
+    assert.equal(after.fmt.id, before.fmt.id, "a swap keeps the format");
+    assert.equal(after.cap, before.cap);
+    assert.equal(after.rounds, before.rounds);
+    assert.equal(after.items.some((i) => i.move.id === item.move.id), false,
+      "a swap never returns the movement it replaced");
+    for (const kept of before.items.filter((i) => i.move.id !== item.move.id)) {
+      assert(after.items.some((i) => i.move.id === kept.move.id), "the other movements stay");
+    }
+  }
+}
+assert(swapsTested > 100, "the swap sweep should cover a useful number of slots");
+
+console.log(`Planner check passed for deterministic 2, 3, 4, and 5-day weeks (${swapsTested} swaps).`);

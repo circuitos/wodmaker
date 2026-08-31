@@ -405,3 +405,35 @@ The reachable cause was a saved preference. `weekConfigs` persists to `localStor
 Fixed at both ends. `planWeek()` records `index` on `wod.plan`, so a card can find the config that produced it whatever its position; and `normaliseWeek()` checks every saved field against the list that owns it, so the stale value never reaches the generator in the first place. The first is the invariant, the second is the cause. `npm run check:planner` covers both, including a deliberately unbuildable day.
 
 This is also why `moves.js` now exports `ENVS`. The three environments were a comment in the header, a literal in `App.jsx`, another in `WeekPlanner.jsx`, and a fourth in `smoke.js`. Validation needs a list that owns the fact.
+
+## One model, two views
+
+The planner and the daily card were two apps sharing a stylesheet. Every fact about a session existed twice: `env` and `intensity` as component state in the daily view and again on each week config, and the strength block as one global `liftRows` grid the week could only borrow wholesale through a `focus` of `"custom"`. The seeds were unrelated too, `seedRef` against `daySeed(weekSeed, i)`. Day one of a week could therefore never be the workout the Day tab was showing, and there was no way to walk through a week tuning each day, which is the thing the planner was for.
+
+This is the same failure the load model had before it was unified: a per-round target in the generator and a session total in the interface, neither aware of the other. The resolution is the same shape. A day is the unit. A week is a list of days. Both views read one `planWeek()` result.
+
+### What a day owns
+
+`{ weekday, env, intensity, rows, locks, swaps, nonce }`. Everything a session needs, and nothing derived.
+
+`rows` replaced `focus` rather than joining it. Storing a preset name and the rows it stands for is two representations of one fact, and they drift the moment a row is edited. The rows are stored; `presetFor(rows)` derives which shortcut they match, or `custom`. One-rep maxes stayed global: a 1RM is a fact about the athlete, not about Wednesday.
+
+`locks` carry `{ moveId, reps }`. `buildCandidate()` deliberately does not rescale a locked item, so the rep count is part of what a lock means; storing the id alone would rescale the movement you locked in order to keep.
+
+`nonce` redraws one day. `daySeed(seed, index, nonce)` moves that day's stream and nothing else, and nonce 0 reproduces the seed a day had before per-day redraws existed, so no saved week moved when this landed.
+
+### Swap had to become an intent
+
+The daily card used to keep its workout in state, so a swap could be applied to it directly. A day is now derived from its config on every render, so an applied swap would vanish on the next keystroke. `config.swaps` stores `{ moveId, nonce }` and `applySwaps()` replays them after the day is generated, pinning `fmt`, `cap` and `rounds` so only the named slot is redrawn. Replaying in order is what makes swapping the same slot twice behave: the second entry names the movement the first one produced.
+
+Writing it down exposed a bug that had always been there. The old swap passed the kept movements as `locked` and let `buildCandidate` fill the empty slot, but `used` only contains the kept movements, so the movement you just rejected was still in the pool and could be drawn straight back. In a small pool it often was, and the button looked broken. `excludeMoves`, which the week planner had introduced for day-to-day variety, is exactly the missing piece: a swap now excludes what it replaces, and the previous day's movements as well, so a swap cannot quietly undo the week's diversity. Checked over 144 swaps in `npm run check:planner`: the format, cap and rounds always survive, every other movement stays, and the rejected movement never comes back.
+
+### A day is addressed by its weekday
+
+Editing a day re-sorts the week, because calendar order is what the carry-over model reads. An index into `configs` therefore points at a different day after almost any edit. `App` keeps `selectedDay` as a weekday, which is unique within a week and survives the sort, and looks the config up by it.
+
+### What this costs
+
+A workout with no week around it no longer exists. Every session belongs to a day, and "Another" redraws that day rather than handing you an anonymous new workout. That is a real loss for someone who only wanted a one-off, and it is the price of the two views agreeing.
+
+Editing one day also changes the days after it. Their reps move because their `arriving` includes the edited day's carry, and their movements can move because they exclude the previous day's. Earlier days never move. This is the diversity and carry-over model doing what it says rather than a leak, and `npm run check:planner` pins the direction: redrawing day two leaves day one untouched.

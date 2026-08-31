@@ -1,17 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { AXES, ENVS } from "./moves.js";
-import { CUES, INTENSITY, STRENGTH } from "./formats.js";
+import { INTENSITY, STRENGTH, cueFor } from "./formats.js";
 import { T } from "./i18n.js";
 import { sessionLoad } from "./generator.js";
-import { WEEK_COUNTS, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, rowsForPreset, weekCount, weekSummary }
-  from "./planner.js";
-import { loadPref, savePref } from "./prefs.js";
+import { WEEK_COUNTS, rowsForPreset } from "./planner.js";
 import { asText, headline, repParts, strengthLine } from "./text.js";
-
-function cueFor(wod, lang) {
-  const cues = CUES[lang][wod.fmt.id];
-  return cues[wod.plan.seed % cues.length];
-}
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
 
@@ -19,36 +12,17 @@ function weekdayName(t, weekday) {
   return t.planner.weekdays[weekday];
 }
 
-export default function WeekPlanner({ lang, oneRM }) {
+/* The week view owns nothing. App holds the configs and the plan, because the
+   Day tab edits the same days; this renders them and hands edits back. */
+export default function WeekPlanner({
+  lang, oneRM, plan, configs, count, summary, onCount, onPatchDay, onAnotherWeek, onOpenDay,
+}) {
   const t = T[lang];
-  const [count, setCount] = useState(() => weekCount(loadPref("weekCount", 2)));
-  /* Whatever was saved is checked against the lists that own each field, so a
-     preference written by an older build cannot reach the generator. */
-  const [configs, setConfigs] = useState(
-    () => normaliseWeek(loadPref("weekConfigs", null), weekCount(loadPref("weekCount", 2)),
-      { oneRM: loadPref("oneRM", {}), liftRows: loadPref("liftRows", null) }),
-  );
-  const [seed, setSeed] = useState(() => loadPref("weekSeed", Math.floor(Math.random() * 2 ** 31)));
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => { savePref("weekCount", count); }, [count]);
-  useEffect(() => { savePref("weekConfigs", configs); }, [configs]);
-  useEffect(() => { savePref("weekSeed", seed); }, [seed]);
-
-  const plan = useMemo(() => planWeek(configs, { seed, oneRM }), [configs, seed, oneRM]);
-  const summary = useMemo(() => weekSummary(plan), [plan]);
   /* One session per weekday: the gap between days is what carry-over decays
      over, so a day already spoken for is not offered twice. */
   const taken = useMemo(() => new Set(configs.map((config) => config.weekday)), [configs]);
-
-  const changeCount = (next) => {
-    setCount(next);
-    setConfigs(defaultWeekConfig(next, oneRM));
-  };
-
-  const editDay = (index, field, value) => setConfigs(
-    (current) => editWeekDay(current, index, field, value),
-  );
 
   const text = useMemo(() => [
     `${t.planner.title} · ${Math.round(summary.total)} ${t.planner.points}`,
@@ -81,7 +55,7 @@ export default function WeekPlanner({ lang, oneRM }) {
           <p className="week-note">{t.planner.note}</p>
         </div>
         <div className="week-actions">
-          <button className="btn pri" onClick={() => setSeed(Math.floor(Math.random() * 2 ** 31))}>
+          <button className="btn pri" onClick={onAnotherWeek}>
             {t.planner.another}
           </button>
           <button className="btn" onClick={copyWeek}>{copied ? t.copied : t.planner.copy}</button>
@@ -93,7 +67,7 @@ export default function WeekPlanner({ lang, oneRM }) {
           <p className="lbl">{t.planner.sessions}</p>
           <div className="seg week-count">
             {WEEK_COUNTS.map((value) => (
-              <button key={value} aria-pressed={count === value} onClick={() => changeCount(value)}>{value}</button>
+              <button key={value} aria-pressed={count === value} onClick={() => onCount(value)}>{value}</button>
             ))}
           </div>
         </div>
@@ -129,7 +103,7 @@ export default function WeekPlanner({ lang, oneRM }) {
                 <div>
                   <span className="day-kicker mono">{t.planner.day} {position + 1}</span>
                   <select className="day-when disp" aria-label={t.planner.weekday} value={config.weekday}
-                    onChange={(event) => editDay(index, "weekday", event.target.value)}>
+                    onChange={(event) => onPatchDay({ weekday: event.target.value }, index)}>
                     {WEEKDAYS.map((weekday) => (
                       <option key={weekday} value={weekday}
                         disabled={weekday !== config.weekday && taken.has(weekday)}>
@@ -145,20 +119,20 @@ export default function WeekPlanner({ lang, oneRM }) {
                 <label>
                   <span>{t.planner.focus}</span>
                   <select value={wod.plan.preset}
-                    onChange={(event) => editDay(index, "rows", rowsForPreset(event.target.value, oneRM))}>
+                    onChange={(event) => onPatchDay({ rows: rowsForPreset(event.target.value, oneRM) }, index)}>
                     {STRENGTH.map((focus) => <option key={focus.id} value={focus.id}>{t.strength[focus.id]}</option>)}
                     {wod.plan.preset === "custom" && <option value="custom">{t.planner.currentGrid}</option>}
                   </select>
                 </label>
                 <label>
                   <span>{t.where}</span>
-                  <select value={config.env} onChange={(event) => editDay(index, "env", event.target.value)}>
+                  <select value={config.env} onChange={(event) => onPatchDay({ env: event.target.value }, index)}>
                     {ENVS.map((env) => <option key={env} value={env}>{t[env]}</option>)}
                   </select>
                 </label>
                 <label>
                   <span>{t.effort}</span>
-                  <select value={config.intensity} onChange={(event) => editDay(index, "intensity", event.target.value)}>
+                  <select value={config.intensity} onChange={(event) => onPatchDay({ intensity: event.target.value }, index)}>
                     <option value="auto">{t.planner.auto}</option>
                     {INTENSITY.map((item) => <option key={item.id} value={item.id}>{t.intensity[item.id]}</option>)}
                   </select>
@@ -215,6 +189,9 @@ export default function WeekPlanner({ lang, oneRM }) {
                 {wod.plan.carryPoints > 1 && (
                   <span>{t.planner.carry}: <b className="mono">{Math.round(wod.plan.carryPoints)}</b></span>
                 )}
+                <button className="day-open disp" onClick={() => onOpenDay(config.weekday)}>
+                  {t.planner.openDay}
+                </button>
               </footer>
             </article>
           );

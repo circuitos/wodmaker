@@ -59,6 +59,7 @@ export function defaultWeekConfig(count = 2, oneRM = {}) {
     intensity: "auto",
     rows: rowsForPreset(FOCUS[safeCount][index], oneRM),
     locks: [],
+    swaps: [],
     nonce: 0,
   }));
 }
@@ -81,6 +82,18 @@ function cleanRows(rows) {
       kg: Number(row.kg) > 0 ? Number(row.kg) : 0,
       ...(row.pct > 0 ? { pct: Number(row.pct) } : {}),
     };
+  }).filter(Boolean);
+}
+
+/* Swapping one movement is stored as an intent, not as a finished workout,
+   because the day is derived from its config every time it is drawn. Each
+   entry replaces one movement inside the shape the day already has, so the
+   format, cap and rounds survive a swap the way they always did. */
+function cleanSwaps(swaps) {
+  if (!Array.isArray(swaps)) return [];
+  return swaps.map((swap) => {
+    const nonce = Number(swap?.nonce);
+    return moveById(swap?.moveId) && Number.isFinite(nonce) ? { moveId: swap.moveId, nonce } : null;
   }).filter(Boolean);
 }
 
@@ -132,16 +145,20 @@ export function normaliseWeek(configs, count, { oneRM = {}, liftRows = null } = 
       intensity: INTENSITY_IDS.has(config?.intensity) ? config.intensity : fallback.intensity,
       rows,
       locks: cleanLocks(config?.locks),
+      swaps: cleanSwaps(config?.swaps),
       nonce: Number.isFinite(nonce) ? nonce : 0,
     };
   }));
 }
 
 /* Moving one day rewrites the order, because the schedule is the thing the
-   carry-over model reads. */
-export function editWeekDay(configs, index, field, value) {
+   carry-over model reads. A patch rather than one field at a time, because a
+   redraw changes several at once and two passes would re-sort twice. */
+export function editWeekDay(configs, index, patch) {
   return orderWeek(configs.map((config, i) => (
-    i === index ? { ...config, [field]: field === "weekday" ? Number(value) : value } : config
+    i === index
+      ? { ...config, ...patch, ...("weekday" in patch ? { weekday: Number(patch.weekday) } : {}) }
+      : config
   )));
 }
 
@@ -190,6 +207,35 @@ function chooseSession(config, context) {
   return candidates[0] || null;
 }
 
+/* Replace one movement at a time inside the shape the day already has. The
+   format, cap and rounds are pinned, every other movement is held at the reps
+   it has, and only the named slot is drawn again. This is what the daily card
+   has always done for a swap; storing it as an intent is what lets the day
+   stay derived from its config rather than kept in the interface. */
+function applySwaps(wod, config, { arriving, strength, seed, intensity, excludeMoves }) {
+  let current = wod;
+  for (const swap of config.swaps || []) {
+    const removed = current.items.find((item) => item.move.id === swap.moveId);
+    if (!removed) continue;
+    const keep = current.items.filter((item) => item.move.id !== swap.moveId);
+    const next = generate(config.env, arriving, {
+      strength,
+      locked: keep,
+      fixed: { fmt: current.fmt, cap: current.cap, rounds: current.rounds, slots: [removed.move.pat] },
+      /* The movement you just rejected is not a candidate to replace itself.
+         `buildCandidate` only marks the kept movements as used, so without
+         this a small pool hands the same one straight back and the button
+         looks broken. The previous day's movements stay excluded too, so a
+         swap cannot undo the week's variety. */
+      excludeMoves: [swap.moveId, ...excludeMoves],
+      intensity: intensityK(intensity),
+      seed: (seed + Math.imul(swap.nonce + 1, 0xC2B2AE35)) >>> 0,
+    });
+    if (next) current = next;
+  }
+  return current;
+}
+
 /* Build a week in order. Each day sees today's strength plus fatigue carried
    from earlier sessions. Actual work is added only once: carried fatigue
    influences composition and volume, but sessionLoad() still counts today's
@@ -222,7 +268,10 @@ export function planWeek(configs, { seed = 1, oneRM = {} } = {}) {
     });
     if (!chosen) return null;
 
-    const wod = chosen.wod;
+    const wod = applySwaps(chosen.wod, config, {
+      arriving, strength, seed: daySeed(seed, index, config.nonce), intensity: chosen.intensity,
+      excludeMoves: previousMoves,
+    });
     wod.strengthRows = strengthRows;
     wod.oneRM = oneRM;
     wod.plan = {
