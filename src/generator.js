@@ -3,6 +3,21 @@ import { FORMATS } from "./formats.js";
 import { arrivingFromPreset } from "./lifts.js";
 /* =========================== GENERATOR =========================== */
 
+/* A small seeded PRNG (mulberry32), shared with scripts/smoke.js. Everything
+   below draws from Math.random() directly rather than threading a generator
+   object through every call, so generate() reproduces a session by swapping
+   Math.random for a seeded stream for the duration of one call and restoring
+   it afterward. Single-threaded JS makes that safe, and it is the same
+   technique the smoke sweep already used to make its own report reproducible. */
+export function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export const rnd = (n) => Math.floor(Math.random() * n);
 export const pick = (arr) => arr[rnd(arr.length)];
 export const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -152,20 +167,43 @@ export function faults(c, env) {
    accepted for convenience.
 
    `opts` carries the rest: `locked` movements to keep, a `fixed` shape when
-   re-rolling one slot, and `intensity`, the soft / normal / hard multiplier.
-   An object rather than three more positional arguments, because the week
-   planner will want to pass its own. */
+   re-rolling one slot, `intensity`, the soft / normal / hard multiplier, and
+   `seed`. An object rather than four more positional arguments, because the
+   week planner will want to pass its own.
+
+   Without a seed this reads Math.random() same as always, which is what
+   scripts/smoke.js relies on: it installs its own seeded Math.random once for
+   the whole sweep, and generate() leaves that alone. With a seed, generate()
+   installs a fresh seeded stream for just this call and restores whatever
+   Math.random was straight after, so it never leaks into anything else.
+
+   The same seed and the same env/arriving/intensity reproduce the same
+   format and the same movements: neither is chosen from anything that
+   depends on arriving or intensity, only the rep scaling is. So changing the
+   strength grid or the soft/normal/hard chip redraws numbers on a session
+   that otherwise holds still, rather than reshuffling it. The one place this
+   can still move the shape is if a candidate that satisfied faults() before
+   no longer does (or the reverse), since a rejected candidate consumes more
+   of the random stream before generate() tries again; in the current data
+   that essentially never happens; see docs/DESIGN.md. */
 export function generate(env, arriving, opts = {}) {
   if (typeof arriving === "string") arriving = arrivingFromPreset(arriving);
-  let best = null, bestScore = Infinity;
-  for (let i = 0; i < 300; i++) {
-    const c = buildCandidate(env, arriving, opts);
-    if (!c) continue;
-    const f = faults(c, env);
-    const hard = f.filter((x) => x.hard).length;
-    if (hard === 0) { c.faults = f; return c; }
-    if (hard < bestScore) { bestScore = hard; best = c; best.faults = f; }
+  const { seed } = opts;
+  const prevRandom = seed != null ? Math.random : null;
+  if (seed != null) Math.random = mulberry32(seed);
+  try {
+    let best = null, bestScore = Infinity;
+    for (let i = 0; i < 300; i++) {
+      const c = buildCandidate(env, arriving, opts);
+      if (!c) continue;
+      const f = faults(c, env);
+      const hard = f.filter((x) => x.hard).length;
+      if (hard === 0) { c.faults = f; return c; }
+      if (hard < bestScore) { bestScore = hard; best = c; best.faults = f; }
+    }
+    return best;
+  } finally {
+    if (prevRandom) Math.random = prevRandom;
   }
-  return best;
 }
 

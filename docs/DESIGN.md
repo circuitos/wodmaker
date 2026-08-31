@@ -313,3 +313,39 @@ The formula scales effort linearly with percentage of a max, and that only holds
 More decisively, the calibration already contains them. The old presets described whole sessions: `press` was worth 115 points as a bench day, ramp included. Logging the ramp separately would count it twice.
 
 The instinct that warm-ups are universal is the reason to leave them out. Something everybody does adds no information; it just shifts the scale.
+
+
+---
+
+# Reproducible sessions, the full card, and an honest default
+
+Three fixes from the same feedback pass.
+
+## The whole thing is deterministic now
+
+Before this, `generate()` called `Math.random()` directly, and section 5's `useEffect` re-ran it on every change to `env`, `arriving` or `intensity`. `arriving` recomputes on every keystroke in the strength grid, so ticking one accessory checkbox reshuffled the entire card: a new format, new movements, everything.
+
+`generate()` now takes an optional `seed`. Without one it behaves exactly as before (`Math.random()`), which is what `scripts/smoke.js` relies on: it installs its own seeded stream once for the whole sweep, and `generate()` leaves that alone. With a seed, `generate()` installs a fresh seeded stream for the duration of that one call only and restores whatever `Math.random` was straight after, so it never leaks into anything else. `mulberry32` moved out of `scripts/smoke.js` and into `generator.js`, so there is one copy rather than two.
+
+Section 5 keeps one seed in a ref (`seedRef`, not state: reading it never needs to trigger a render on its own) and is deliberate about when it changes:
+
+- **A new seed:** first mount, changing where you train, or pressing "Another". These are the moments that mean "give me a different session."
+- **The same seed, reused:** ticking a strength row or moving the soft/normal/hard chip. `roll(false, false)` calls `generate()` again with the unchanged `seedRef.current`.
+
+That works because of what does and does not feed into the random draws. Format, slot pattern, and which movements get picked all come from `Math.random()` calls that know nothing about `arriving` or `intensity`; only the final rep-scaling step reads them. So the same seed with a different strength load or a different chip reproduces the same format and the same movements, and only the numbers move. Verified over 30 seeds, comparing `intensity: 1.0` against `intensity: 1.4`: format identical in 30/30, movement set identical in 30/30, reps changed in 22/30 (the other 8 are the EMOM clamp already on record elsewhere in this document, not a new issue).
+
+**The one place this can still move the shape.** `generate()` tries up to 300 candidates and returns the first with zero hard faults. Faults depend on `arriving.pre`, so a candidate that passed before could fail now, or the reverse, which changes how many candidates the loop consumes before it stops and therefore how far into the seeded stream the accepted one sits. In the measured data this is not a real risk: the smoke sweep found 0 of 8400 workouts carrying a hard fault, so the loop accepts the very first candidate essentially always. Recorded here rather than hidden, since "reproduces" should come with its actual guarantee, not an unqualified one.
+
+The swap icon on a single movement deliberately does **not** reuse `seedRef`. If it did, clicking swap on the same slot would draw from the same point in the same stream every time and hand back the identical replacement, forever. It draws a fresh `Math.random()`-based seed on every click instead, scoped to that one `generate()` call, so the session's own seed (and therefore the shape of everything else) is untouched.
+
+## The card shows the whole session, not half of it
+
+The strength block already fed into `wod.strength` (`pre`, `dampen`, the axis pre-load markers on the bars), but nothing on screen said *what* you actually lifted. `pctFor`, previously a one-off inline in section 5, moved to `lifts.js` as an exported function so the input grid and the card compute the same percentage the same way. `strengthLine()` in `text.js` renders one row, main lift or accessory, in the same units the grid itself shows.
+
+`roll()` and `swapOne()` now snapshot `liftRows` and `oneRM` onto the generated candidate (`c.strengthRows`, `c.oneRM`), the same ad hoc pattern this file already used for `c.cue`. The card reads them in a block above the format headline, since chronologically the strength work happened first and it is why the axis bars carry their pre-load markers. `asText()` prepends the same lines, so Copy, Share, and the calendar export all agree with what the card shows.
+
+## The accessory default, and what it is and is not based on
+
+Checked before writing anything: the 55 sample sessions this app was built from are not in the repository, only what got distilled out of them into `MOVES`, `FORMATS`, and the seven `STRENGTH` presets. And even those presets carry zero accessory rows. `PRESET_ROWS` is main lifts only, for every one of the seven. So there is no session-frequency signal anywhere in this codebase to pre-select accessory work from, not even in aggregate.
+
+Rather than invent one, the starter default (walking lunges, DB row, both 3x8) is the two movements reported as actual accessory work earlier in this conversation. It is the fallback `loadPref("liftRows", ...)` returns when nothing has been saved yet, so it only ever applies to a first-time visitor and is never applied over a saved choice. Verified: a fresh browser context shows the two rows ticked; a context with its own saved `liftRows` keeps exactly that.

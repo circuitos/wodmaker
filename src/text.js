@@ -1,4 +1,5 @@
 import { T } from "./i18n.js";
+import { liftById, moveById, pctFor } from "./lifts.js";
 /* =========================== TEXT RENDERING =========================== */
 
 export function repLine(it, lang, env) {
@@ -9,6 +10,25 @@ export function repLine(it, lang, env) {
   if (m.unit === "s") return `${it.reps}" ${name}${side}${kg}`;
   if (m.unit === "m" || m.unit === "cal") return `${it.reps} ${name}${side}${kg}`;
   return `${it.reps} ${name}${side}${kg}`;
+}
+
+/* One line for one row of the strength block, main lift or accessory, in
+   the same units the grid itself shows: sets x reps, the weight, and a
+   percentage where one can be computed. Used by the card and by the plain
+   text export, so what you read and what you copy always agree. */
+export function strengthLine(row, lang, oneRM) {
+  const kgTxt = row.kg > 0 ? ` · ${row.kg} kg` : "";
+  if (row.liftId) {
+    const lift = liftById(row.liftId);
+    if (!lift) return "";
+    const pct = pctFor(row, oneRM);
+    const pctTxt = pct ? ` · ${Math.round(pct * 100)}%` : "";
+    return `${row.sets}×${row.reps} ${lift[lang]}${kgTxt}${pctTxt}`;
+  }
+  const move = moveById(row.moveId);
+  if (!move) return "";
+  const side = move.side ? ` ${T[lang].side}` : "";
+  return `${row.sets}×${row.reps} ${move[lang]}${side}${kgTxt}`;
 }
 
 export function headline(c, lang) {
@@ -28,7 +48,13 @@ export function headline(c, lang) {
 
 export function asText(c, lang, env) {
   const t = T[lang];
-  const lines = [headline(c, lang), ""];
+  const lines = [];
+  if (c.strengthRows?.length) {
+    lines.push(t.before);
+    c.strengthRows.forEach((r) => lines.push(`· ${strengthLine(r, lang, c.oneRM || {})}`));
+    lines.push("");
+  }
+  lines.push(headline(c, lang), "");
   if (c.fmt.id === "emom") {
     c.items.forEach((it, i) => lines.push(`Min ${i + 1} → ${repLine(it, lang, env)}`));
     if (c.items.length === 3) lines.push(`Min 4 → ${t.rest}`);

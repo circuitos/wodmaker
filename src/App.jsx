@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { AXES } from "./moves.js";
 import { CUES, INTENSITY, STRENGTH, intensityK } from "./formats.js";
-import { ACCESSORY, LIFTS, PRESET_ROWS, arrivingFromLifts, moveById } from "./lifts.js";
+import { ACCESSORY, LIFTS, PRESET_ROWS, arrivingFromLifts, moveById, pctFor } from "./lifts.js";
 import { T } from "./i18n.js";
 import { generate, pick, sessionLoad } from "./generator.js";
-import { asText, headline } from "./text.js";
+import { asText, headline, strengthLine } from "./text.js";
 import { platesFor } from "./plates.js";
 import { loadPref, savePref } from "./prefs.js";
 
@@ -135,6 +135,10 @@ const CSS = `
 .ico:hover{opacity:1;background:#F0EFEA}
 .ico[aria-pressed="true"]{opacity:1;color:var(--red)}
 .cue{padding:0 18px 16px;font-size:13px;color:var(--ink-2);font-style:italic}
+.prev{padding:14px 18px 12px;border-bottom:2px solid var(--ink);background:#FAFAF7}
+.prevlist{list-style:none;margin:0;padding:0;font-size:13px;color:var(--ink-2)}
+.prevlist li{padding:2px 0}
+.prevlist li::before{content:"· ";color:var(--ink-2)}
 .meter{border-top:2px solid var(--ink);padding:16px 18px}
 .mhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
 .work{font-size:26px;font-weight:700}
@@ -194,7 +198,18 @@ export default function App() {
   /* What you lifted before this: one row per ticked lift. `kg` is what you put
      on the bar; `pct` only carries a preset's intent when no 1RM is on file to
      turn it into kilos. */
-  const [liftRows, setLiftRows] = useState(() => loadPref("liftRows", []));
+  /* No real default exists to seed this from: the 55 sample sessions this app
+     was built from are not in the repo, only what got distilled out of them
+     (MOVES doses, FORMATS weights, the STRENGTH presets), and even those
+     presets carry zero accessory rows. So this starter pair is not derived
+     from that corpus; it is what was reported as the actual accessory work
+     in this conversation, used only when nothing has been saved yet. Anyone
+     who ticks their own rows keeps them from then on. */
+  const DEFAULT_ACCESSORY = [
+    { moveId: "walking_lunge", sets: 3, reps: 8, kg: 0 },
+    { moveId: "db_row", sets: 3, reps: 8, kg: 0 },
+  ];
+  const [liftRows, setLiftRows] = useState(() => loadPref("liftRows", DEFAULT_ACCESSORY));
   /* One-rep maxes are a fact about you, not about today, so they outlive the
      session and the reload. */
   const [oneRM, setOneRM] = useState(() => loadPref("oneRM", {}));
@@ -205,6 +220,16 @@ export default function App() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("09:45");
 
+  /* The session's random seed. A new one is drawn only when something asks for
+     a genuinely new session (mount, changing where you train, "Another"). Any
+     other change, ticking a strength row, moving the soft/normal/hard chip,
+     reuses it: same seed plus the same env/arriving/intensity reproduces the
+     same format and the same movements (see generate() in generator.js), so
+     the card holds still and only its numbers respond. A ref rather than
+     state, since reading it never needs to trigger a render on its own. */
+  const seedRef = useRef(Math.floor(Math.random() * 2 ** 31));
+  const isFirstArriving = useRef(true);
+
   useEffect(() => { savePref("lang", lang); }, [lang]);
   useEffect(() => { savePref("meterOpen", meterOpen); }, [meterOpen]);
   useEffect(() => { savePref("liftRows", liftRows); }, [liftRows]);
@@ -212,9 +237,8 @@ export default function App() {
   useEffect(() => { savePref("intensity", intensity); }, [intensity]);
   const t = T[lang];
 
-  const pctFor = (r) => (oneRM[r.liftId] > 0 && r.kg > 0 ? r.kg / oneRM[r.liftId] : r.pct);
   const arriving = useMemo(
-    () => arrivingFromLifts(liftRows.map((r) => ({ ...r, pct: pctFor(r) }))),
+    () => arrivingFromLifts(liftRows.map((r) => ({ ...r, pct: pctFor(r, oneRM) }))),
     // eslint-disable-next-line
     [liftRows, oneRM]);
 
@@ -236,17 +260,30 @@ export default function App() {
   const applyPreset = (id) => setLiftRows(
     PRESET_ROWS[id].map((r) => ({ ...r, kg: oneRM[r.liftId] > 0 ? Math.round(oneRM[r.liftId] * r.pct) : 0 })));
 
-  const roll = (keepLocks = false) => {
+  const roll = (keepLocks = false, newSession = false) => {
+    if (newSession) seedRef.current = Math.floor(Math.random() * 2 ** 31);
     const locked = keepLocks && wod ? wod.items.filter((it) => locks[it.move.id]) : [];
-    const c = generate(env, arriving, { locked, intensity: intensityK(intensity) });
+    const c = generate(env, arriving, { locked, intensity: intensityK(intensity), seed: seedRef.current });
     if (!c) return;
     c.cue = pick(CUES[lang][c.fmt.id]);
+    c.strengthRows = liftRows;
+    c.oneRM = oneRM;
     setWod(c);
     if (!keepLocks) setLocks({});
     setCopied(false);
   };
 
-  useEffect(() => { roll(false); /* eslint-disable-next-line */ }, [env, arriving, intensity]);
+  // A genuinely new session: first mount, or a different place to train.
+  useEffect(() => { roll(false, true); /* eslint-disable-next-line */ }, [env]);
+
+  // The strength grid or the effort chip changed. Same session, same seed:
+  // reuse it so the format and movements hold still and only the numbers move.
+  // Skipped on mount, since the [env] effect above already rolled once.
+  useEffect(() => {
+    if (isFirstArriving.current) { isFirstArriving.current = false; return; }
+    roll(false, false);
+    // eslint-disable-next-line
+  }, [arriving, intensity]);
   useEffect(() => { if (wod) setWod({ ...wod, cue: pick(CUES[lang][wod.fmt.id]) }); /* eslint-disable-next-line */ }, [lang]);
 
   const text = useMemo(() => (wod ? asText(wod, lang, env) : ""), [wod, lang, env]);
@@ -297,9 +334,12 @@ export default function App() {
     const removed = wod.items.find((it) => it.move.id === id);
     const keep = wod.items.filter((it) => it.move.id !== id);
     const fixed = { fmt: wod.fmt, cap: wod.cap, rounds: wod.rounds, slots: [removed.move.pat] };
-    const c = generate(env, arriving, { locked: keep, fixed, intensity: intensityK(intensity) });
+    const swapSeed = Math.floor(Math.random() * 2 ** 31);
+    const c = generate(env, arriving, { locked: keep, fixed, intensity: intensityK(intensity), seed: swapSeed });
     if (!c) return;
     c.cue = wod.cue;
+    c.strengthRows = liftRows;
+    c.oneRM = oneRM;
     setWod(c);
   };
 
@@ -365,7 +405,7 @@ export default function App() {
                 {LIFTS.map((lift) => {
                   const row = findRow(lift.id);
                   const rm = oneRM[lift.id] || 0;
-                  const pct = row ? pctFor(row) : undefined;
+                  const pct = row ? pctFor(row, oneRM) : undefined;
                   return (
                     <li key={lift.id} className={row ? "lift on" : "lift"}>
                       <label className="lname">
@@ -442,6 +482,16 @@ export default function App() {
 
           {wod && (
             <main className="card">
+              {wod.strengthRows?.length > 0 && (
+                <div className="prev">
+                  <p className="lbl" style={{ margin: "0 0 4px" }}>{t.before}</p>
+                  <ul className="prevlist">
+                    {wod.strengthRows.map((r, i) => (
+                      <li key={i}>{strengthLine(r, lang, wod.oneRM || {})}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="card-h">
                 <div className="fmt disp">{headline(wod, lang)}</div>
                 <div className="tag mono">
@@ -513,7 +563,7 @@ export default function App() {
               )}
 
               <div className="acts">
-                <button className="btn pri" onClick={() => roll(true)}><IconSwap /> {t.another}</button>
+                <button className="btn pri" onClick={() => roll(true, true)}><IconSwap /> {t.another}</button>
                 <button className="btn" onClick={doCopy}>{copied ? t.copied : t.copy}</button>
                 <button className="btn" onClick={doShare}>{t.share}</button>
                 <button className="btn" onClick={() => setCalOpen(!calOpen)}>{t.cal}</button>

@@ -192,3 +192,11 @@ export function arrivingFromPreset(id) {
  * described whole sessions: `press` was worth 115 points as a bench day, ramp
  * included. Logging the ramp separately would count it twice.
  */
+
+/* The percentage a grid row is really at: the entered kg over a stored 1RM
+   when both exist, else whatever pct a preset carried (or nothing, for
+   accessory rows, which never have a max to divide by). Shared by the input
+   grid and by anything that renders a row back out, so both always agree. */
+export function pctFor(row, oneRM) {
+  return oneRM[row.liftId] > 0 && row.kg > 0 ? row.kg / oneRM[row.liftId] : row.pct;
+}

@@ -18,23 +18,17 @@ import path from "node:path";
 import { AXES } from "../src/moves.js";
 import { FORMATS, STRENGTH } from "../src/formats.js";
 import { arrivingFromPreset } from "../src/lifts.js";
-import { generate, sessionLoad } from "../src/generator.js";
+import { generate, mulberry32, sessionLoad } from "../src/generator.js";
 
 const SAMPLES = Number(process.env.SAMPLES || 400);
 const SEED = Number(process.env.SEED || 1);
 const OUT = process.env.OUT || "out/smoke-report.md";
 const ENVS = ["gym", "parque", "casa"];
 
-// The generator calls Math.random directly. Swap in a seeded PRNG so two runs
-// of the same code produce identical reports and a diff means a real change.
-function mulberry32(a) {
-  return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// Swap in the same seeded PRNG generate() itself uses for a single seeded
+// call, but install it globally here so the whole sweep is one reproducible
+// stream: two runs of the same code produce identical reports, and a diff
+// means a real change.
 Math.random = mulberry32(SEED);
 
 const conditioning = (c) => sessionLoad(c).conditioning;
