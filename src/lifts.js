@@ -101,6 +101,13 @@ export const ACCESSORY = [
      the one piece of supplementary work that needs no equipment at all. Priced
      per unit by the movement's own `cost`, same as every other accessory, so a
      500 m row is about 31 points and 400 m of running about 30. */
+  /* Evidenced as accessory work in the source log and already in `MOVES`, so
+     offering them costs nothing: pull-ups in 5 sessions, farmer carries in 4,
+     renegade rows and side planks in 1 each. */
+  { moveId: "pull_up", refKg: 0 },
+  { moveId: "farmer_carry", refKg: 0 },
+  { moveId: "renegade_row", refKg: 30 },
+  { moveId: "side_plank", refKg: 0 },
   { moveId: "row_cal", refKg: 0 },
   { moveId: "row_m", refKg: 0 },
   { moveId: "run_m", refKg: 0 },

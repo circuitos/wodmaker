@@ -575,3 +575,48 @@ The underlying drift is still there. Editing a lift by one rep changes the forma
 **Smaller ones.** "Another week" left stale swap intents behind, which could fire dormant on a later week that happened to contain the old movement. Copy feedback and a hand-picked calendar date belonged to the whole app rather than to the day they were set on.
 
 **Two published numbers did not reproduce.** Home `nopull` was given as 93.7% to 56.2%; the sweep says 93.5% to 45.8%. The first figure came from an ad-hoc sample of one strength block, using a seed and a sample size that were never committed. The corpus block-cost median of 43 has been withdrawn entirely for the same reason, compounded by the parser fault described below. A number that cannot be regenerated from the repository should not be stated in it as fact.
+
+## The corpus, read properly
+
+The review's third finding was that the parser counted the movements inside an unlabelled conditioning piece as accessory work. It reproduced, and it was worse than a miscount: the accessory table the app drew from was largely fiction.
+
+The parser split each entry on the first marker word (`WOD`, `AMRAP`, `EMOM`, `FOR TIME`, `FINAL`) and treated everything before it as pre-conditioning work. Thirteen of the 56 entries never write one. `[11/4] 3 rondas / 200 m remo / 12 DB thrusters / 12 sit-ups / 10 box step-ups / 30" plancha frontal` is a conditioning piece, and the parser read it as a five-movement accessory block.
+
+The verification that missed this is worth naming. When the counts were first published, the 28 entries with *no* detected accessory work were checked by eye and found to be genuinely conditioning-only. The 28 *with* it were not checked. One direction of a two-directional claim was verified and the result reported as though both had been.
+
+### What the log actually says
+
+`data/annotations.json` now records, by hand and keyed by the log's own timestamps, which rows of each entry are barbell work, which are accessory work, and whether there is a piece at all. `analyze-corpus.js` reads it and refuses to run if it disagrees with the log on count, order or timestamps. The log stays verbatim; it is the thing the annotation is checked against, which is the whole reason for keeping it.
+
+Of 56 entries: 54 contain a conditioning piece, 17 contain barbell work, 28 contain an accessory block. Coincidentally the same 28 as before, and almost entirely different entries.
+
+Block sizes are `{0: 28, 1: 10, 2: 12, 3: 4, 4: 2}`, not the `{0: 28, 1: 18, 2: 5, 3: 5}` published earlier. Two movements is the most common accessory block, not one.
+
+The movement table changed completely:
+
+| | claimed | actual |
+|---|---:|---:|
+| walking lunges | 10 | **0** |
+| box step-ups | 4 | **0** |
+| dumbbell press | not listed | 8 |
+| split squat | folded into walking lunges | 7 |
+| back extension | not listed | 7 |
+| pull-ups | not listed | 5 |
+| farmer carry | not listed | 4 |
+| dumbbell row | 6 | 6 |
+
+Walking lunges and box step-ups, the two movements the accessory defaults were built on, do not appear in a single real accessory block. They are common inside conditioning pieces, which is exactly what the parser was reading.
+
+### What the app can and cannot offer
+
+Naming movements honestly rather than mapping them onto the nearest match exposes a gap that the old table hid. The three most common accessory movements in the log are a dumbbell press, a split squat and a back extension, and the app has a movement for none of them. `CORPUS_DEFAULTS.unrepresentedAccessory` lists all eight, so the gap is visible rather than papered over by calling a Bulgarian split squat a walking lunge, which loses the per-side dose and prices it at half.
+
+Four movements the log evidences were already in `MOVES` and merely not offered as accessory work: pull-ups, farmer carries, renegade rows and side planks. Offering them costs nothing, changes no generated workout, and takes the drawable pool from five movements to nine.
+
+### Sizing the draw
+
+The gym block now takes both its size and its ceiling from the log: the size distribution above, and a cost cap of about 160 points, the heaviest block the log contains. Without the cap a draw of three expensive movements reached 289 points and outweighed the piece it preceded. A movement that would breach the ceiling is passed over rather than ending the draw, so one heavy choice cannot land beyond it.
+
+Away from a barbell the budget governs instead, and the evidenced pool cannot always fill it, so whatever else the place allows completes the block at a low weight. That filler is not corpus support and is not described as any.
+
+Measured over 3000 draws, the gym block matches the log at 36/44/16/5 percent against 36/43/14/7, tops out at exactly 160 points, and takes 88% of its movements from the evidenced pool. Session loads still land on their targets: gym 411 against 450, park 337 against 350, home 313 against 320.

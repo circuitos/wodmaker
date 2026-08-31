@@ -2,8 +2,8 @@ import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, intensityK } from "./formats.js";
 import { generate, mulberry32, sessionAxisLoad, sessionLoad } from "./generator.js";
 import {
-  PRESET_ROWS, accessoryPoints, accessoriesFor, arrivingFromAxis, arrivingFromLifts, liftById,
-  moveById, pctFor, rowAvailable, splitRows,
+  PRESET_ROWS, accessoryPoints, accessoriesFor, arrivingFromAxis, arrivingFromLifts,
+  defaultAccessoryRow, liftById, moveById, pctFor, rowAvailable, splitRows,
 } from "./lifts.js";
 import { CORPUS_DEFAULTS } from "./corpus.js";
 
@@ -87,13 +87,28 @@ export function drawAccessory(seed = 0, env = "gym", budget = undefined) {
     return items[items.length - 1];
   };
 
-  const offered = new Set(accessoriesFor(env).map((acc) => acc.moveId));
-  const pool = CORPUS_DEFAULTS.accessory.filter((entry) => offered.has(entry.moveId));
+  const offered = accessoriesFor(env).map((acc) => acc.moveId);
+  const evidenced = new Set(CORPUS_DEFAULTS.accessory.map((entry) => entry.moveId));
+  /* The movements the log evidences come first, weighted by how often it
+     records them. Away from a barbell the budget can outrun that pool, so
+     whatever else the place allows fills the rest, at a low weight and using
+     each movement's own default dose. Filler is not corpus support and is not
+     described as any. */
+  const pool = [
+    ...CORPUS_DEFAULTS.accessory.filter((entry) => offered.includes(entry.moveId)),
+    ...offered.filter((id) => !evidenced.has(id))
+      .map((id) => ({ ...defaultAccessoryRow(id), sessions: 0.3 })),
+  ];
   const cap = budget === undefined ? PRE_BUDGET[env] ?? null : budget;
 
   /* With a barbell in the session, the log says how big this block is: one
      movement most often, never more than three. Without one, keep drawing
      until the block is worth doing on its own. */
+  /* The heaviest accessory block in the log is worth about 160 points. With a
+     barbell in the session the size comes from the log but the cost does not,
+     so a draw of three expensive movements could reach 289 and outweigh the
+     piece it precedes. Away from a barbell the budget governs instead. */
+  const ceiling = cap === null ? 160 : Infinity;
   let want = 5;
   if (cap === null) {
     const sizes = Object.entries(CORPUS_DEFAULTS.accessoryBlockSizes)
@@ -107,9 +122,14 @@ export function drawAccessory(seed = 0, env = "gym", budget = undefined) {
   while (pool.length && picked.length < want && (cap === null || points < cap)) {
     const choice = weighted(pool, (item) => item.sessions);
     pool.splice(pool.indexOf(choice), 1);
-    const row = { moveId: choice.moveId, sets: choice.sets, reps: choice.reps, kg: choice.kg };
+    const row = { moveId: choice.moveId, sets: choice.sets, reps: choice.reps, kg: choice.kg || 0 };
+    const cost = accessoryPoints(row);
+    /* A movement that would take the block past the ceiling is passed over
+       rather than ending the draw, so one heavy choice cannot land beyond it.
+       The first is always taken: a block of nothing is not the answer. */
+    if (picked.length > 0 && points + cost > ceiling) continue;
     picked.push(row);
-    points += accessoryPoints(row);
+    points += cost;
   }
   return picked;
 }

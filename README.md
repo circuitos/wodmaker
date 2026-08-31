@@ -29,7 +29,7 @@ The live site is auto-deployed from the default branch. Every other branch gets 
 
 The app has one model and two views of it. A week is a list of days, and a day carries everything about a session: which weekday, where you train, how hard, the strength block, and anything you locked.
 
-A session is three blocks in the order they happen: barbell work against a one-rep max, then the accessory or supplementary work between it and the piece, then the conditioning piece itself. The strength shortcuts name the barbell block only, so switching from squats to pressing leaves your supplementary work alone. A day arrives with an accessory block already chosen, drawn from what the source log actually contains: one to three movements, weighted by how often each appears. "Another" redraws it with the piece.
+A session is three blocks in the order they happen: barbell work against a one-rep max, then the accessory or supplementary work between it and the piece, then the conditioning piece itself. The strength shortcuts name the barbell block only, so switching from squats to pressing leaves your supplementary work alone. A day arrives with an accessory block already chosen, drawn from what the source log actually contains: one to four movements, weighted by how often each appears. "Another" redraws it with the piece.
 
 Where you train decides the whole session, not just the conditioning piece. A park has no barbell, so a park day is built from what a park has: weighted pull-ups if you want them, a longer accessory block to do the work the barbell would have done, and a conditioning piece drawn from the same pool. A living room has no barbell either, but it does have dumbbells, so it keeps the movements a light-medium pair can do. Each environment has its own idea of what a good day is worth (450 points at the gym, 350 in a park, 320 at home), and the automatic effort aims at the one you are in. Switching back to the gym gives you the gym session you left.
 
@@ -80,6 +80,7 @@ wodmaker/
 │   └── build-preview-site.mjs  # composes the Pages site (run by CI)
 ├── data/
 │   ├── 55_sessions.txt         # original source dump, kept verbatim
+│   ├── annotations.json        # where each entry's blocks begin and end
 │   └── README.md               # provenance and derived defaults
 ├── out/
 │   └── smoke-report.md         # latest sweep (regenerated, never hand-edited)
@@ -116,7 +117,7 @@ Two things to get right: `load` shares should sum to about 1, and `cost` is cali
 
 Run `npm run smoke` before and after any change to the generator or the data, and read the diff in `out/smoke-report.md`. The output is random, so a workout that looks plausible proves nothing; the distributions do.
 
-Run `npm run check:planner` after planner changes and `npm run corpus` after changing the source-log parser or any corpus-derived default.
+Run `npm run check:planner` after planner changes and `npm run corpus` after changing `data/annotations.json` or any corpus-derived default. The annotation says where each logged session's blocks begin and end; the log itself stays verbatim and the analyser checks one against the other.
 
 See `CLAUDE.md` for the field reference and the known gotchas. Anything larger than a data edit, meaning a new control, mode, or screen, starts with the check in its Adding Features section: work out where the idea belongs and what it replaces before writing code.
 
