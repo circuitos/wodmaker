@@ -26,29 +26,29 @@ export const REP_AT_75 = 5;
 export const REF_PCT = 0.75;
 
 export const LIFTS = [
-  { id: "back_squat", es: "sentadilla trasera", en: "back squat", bar: 20, toll: 1.0,
+  { id: "back_squat", es: "sentadilla trasera", en: "back squat", bar: 20, toll: 1.0, env: ["gym"],
     load: { piernas: 0.64, posterior: 0.21, core: 0.15 } },
-  { id: "front_squat", es: "sentadilla frontal", en: "front squat", bar: 20, toll: 1.0,
+  { id: "front_squat", es: "sentadilla frontal", en: "front squat", bar: 20, toll: 1.0, env: ["gym"],
     load: { piernas: 0.60, posterior: 0.15, core: 0.25 } },
-  { id: "deadlift", es: "peso muerto", en: "deadlift", bar: 20, toll: 2.0,
+  { id: "deadlift", es: "peso muerto", en: "deadlift", bar: 20, toll: 2.0, env: ["gym"],
     load: { posterior: 0.51, agarre: 0.24, piernas: 0.14, core: 0.11 } },
-  { id: "rdl", es: "peso muerto rumano", en: "Romanian deadlift", bar: 20, toll: 1.5,
+  { id: "rdl", es: "peso muerto rumano", en: "Romanian deadlift", bar: 20, toll: 1.5, env: ["gym"],
     load: { posterior: 0.58, agarre: 0.22, piernas: 0.10, core: 0.10 } },
-  { id: "hip_thrust", es: "hip thrust", en: "hip thrust", bar: 20, toll: 0.8,
+  { id: "hip_thrust", es: "hip thrust", en: "hip thrust", bar: 20, toll: 0.8, env: ["gym"],
     load: { posterior: 0.70, piernas: 0.20, core: 0.10 } },
-  { id: "lunge", es: "zancadas con barra", en: "barbell lunge", bar: 20, toll: 1.0,
+  { id: "lunge", es: "zancadas con barra", en: "barbell lunge", bar: 20, toll: 1.0, env: ["gym"],
     load: { piernas: 0.62, posterior: 0.23, core: 0.15 } },
-  { id: "bench", es: "press banca", en: "bench press", bar: 20, toll: 1.0,
+  { id: "bench", es: "press banca", en: "bench press", bar: 20, toll: 1.0, env: ["gym"],
     load: { empuje: 0.74, core: 0.17, traccion: 0.09 } },
-  { id: "ohp", es: "press militar", en: "overhead press", bar: 20, toll: 1.1,
+  { id: "ohp", es: "press militar", en: "overhead press", bar: 20, toll: 1.1, env: ["gym"],
     load: { empuje: 0.68, core: 0.24, traccion: 0.08 } },
-  { id: "push_press", es: "push press", en: "push press", bar: 20, toll: 1.0,
+  { id: "push_press", es: "push press", en: "push press", bar: 20, toll: 1.0, env: ["gym"],
     load: { empuje: 0.58, piernas: 0.20, core: 0.22 } },
-  { id: "weighted_pullup", es: "dominadas lastradas", en: "weighted pull-up", bar: 0, toll: 1.0,
+  { id: "weighted_pullup", es: "dominadas lastradas", en: "weighted pull-up", bar: 0, toll: 1.0, env: ["gym", "parque"],
     load: { traccion: 0.61, agarre: 0.29, core: 0.10 } },
-  { id: "barbell_row", es: "remo con barra", en: "barbell row", bar: 20, toll: 1.0,
+  { id: "barbell_row", es: "remo con barra", en: "barbell row", bar: 20, toll: 1.0, env: ["gym"],
     load: { traccion: 0.55, agarre: 0.25, posterior: 0.12, core: 0.08 } },
-  { id: "power_clean", es: "cargada de potencia", en: "power clean", bar: 20, toll: 1.6,
+  { id: "power_clean", es: "cargada de potencia", en: "power clean", bar: 20, toll: 1.6, env: ["gym"],
     load: { posterior: 0.38, piernas: 0.25, traccion: 0.17, agarre: 0.12, core: 0.08 } },
 ];
 
@@ -136,6 +136,18 @@ export function accessoryRepMax(move) {
 }
 
 export const accessoryById = (id) => ACCESSORY.find((a) => a.moveId === id);
+
+/* What you can actually do where you are. A barbell lift needs a barbell, so
+   every one of them is gym-only; a weighted pull-up needs something to hang
+   from, which the park has. Accessory work inherits availability from the
+   movement it names, which `MOVES` already records. */
+export const liftsFor = (env) => LIFTS.filter((lift) => lift.env.includes(env));
+export const accessoriesFor = (env) => ACCESSORY.filter(
+  (acc) => moveById(acc.moveId)?.env.includes(env),
+);
+export const rowAvailable = (row, env) => (row.liftId
+  ? !!liftById(row.liftId)?.env.includes(env)
+  : !!moveById(row.moveId)?.env.includes(env));
 export const moveById = (id) => MOVES.find((m) => m.id === id);
 
 /* Points for one accessory row. `reps` is per set, and per side where the

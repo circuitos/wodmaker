@@ -2,7 +2,8 @@ import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, intensityK } from "./formats.js";
 import { generate, mulberry32, sessionAxisLoad, sessionLoad } from "./generator.js";
 import {
-  PRESET_ROWS, arrivingFromAxis, arrivingFromLifts, liftById, moveById, pctFor, splitRows,
+  PRESET_ROWS, accessoryPoints, accessoriesFor, arrivingFromAxis, arrivingFromLifts, liftById,
+  moveById, pctFor, rowAvailable, splitRows,
 } from "./lifts.js";
 import { CORPUS_DEFAULTS } from "./corpus.js";
 
@@ -11,7 +12,33 @@ import { CORPUS_DEFAULTS } from "./corpus.js";
    55% survives each calendar day, giving roughly 30% after the usual
    Monday-to-Wednesday gap in the source sessions. */
 export const DAILY_CARRY = 0.55;
-export const TARGET_DAY_LOAD = 310;
+
+/* What a good day is worth, by where you train. A gym day has a barbell in it
+   and can carry a great deal more than a park or a living room, so one target
+   for all three made the automatic effort read as timid at the gym and
+   unreachable at home.
+
+   These are chosen against what each environment can actually produce, not
+   picked for how they read: with a full barbell block a gym session runs to a
+   median of 377 points at normal effort and 427 at hard, a park session with
+   weighted pull-ups to 272 and 318, and a session with no loadable movement at
+   all to about 177 and 240. Re-measure before moving them. */
+export const TARGET_DAY_LOAD = { gym: 450, parque: 350, casa: 320 };
+export const targetFor = (env) => TARGET_DAY_LOAD[env] ?? TARGET_DAY_LOAD.gym;
+
+/* How much work a day carries before the conditioning piece, in points, across
+   the barbell block and the accessory block together. At the gym the barbell
+   does the heavy lifting and the log's own accessory blocks are small, so
+   `null` means size the accessory block the way the log sizes one rather than
+   fill to a budget.
+
+   Away from a barbell the accessory block has to do that work instead, and the
+   log has nothing to say about it because every session in it was a gym
+   session. These two figures are a product choice tuned against the targets
+   above. The budget covers the whole block, so a park day that keeps weighted
+   pull-ups gets a small accessory block and one with no barbell at all gets a
+   long one. */
+const PRE_BUDGET = { gym: null, parque: 150, casa: 115 };
 
 const SCHEDULES = {
   2: CORPUS_DEFAULTS.trainingDays,
@@ -51,7 +78,7 @@ export function rowsForPreset(id, oneRM = {}) {
    what the log actually contains, and each is written at the dose recorded
    next to it. Machine and running work is offered in the grid but never drawn,
    since the log gives no evidence for it as accessory work. */
-export function drawAccessory(seed = 0) {
+export function drawAccessory(seed = 0, env = "gym", budget = undefined) {
   const random = mulberry32(seed >>> 0);
   const weighted = (items, weight) => {
     const total = items.reduce((sum, item) => sum + weight(item), 0);
@@ -60,25 +87,64 @@ export function drawAccessory(seed = 0) {
     return items[items.length - 1];
   };
 
-  const sizes = Object.entries(CORPUS_DEFAULTS.accessoryBlockSizes)
-    .map(([size, count]) => ({ size: Number(size), count }))
-    .filter((entry) => entry.size > 0);
-  const n = weighted(sizes, (entry) => entry.count).size;
+  const offered = new Set(accessoriesFor(env).map((acc) => acc.moveId));
+  const pool = CORPUS_DEFAULTS.accessory.filter((entry) => offered.has(entry.moveId));
+  const cap = budget === undefined ? PRE_BUDGET[env] ?? null : budget;
 
-  const pool = [...CORPUS_DEFAULTS.accessory];
+  /* With a barbell in the session, the log says how big this block is: one
+     movement most often, never more than three. Without one, keep drawing
+     until the block is worth doing on its own. */
+  let want = 5;
+  if (cap === null) {
+    const sizes = Object.entries(CORPUS_DEFAULTS.accessoryBlockSizes)
+      .map(([size, count]) => ({ size: Number(size), count }))
+      .filter((entry) => entry.size > 0);
+    want = weighted(sizes, (entry) => entry.count).size;
+  }
+
   const picked = [];
-  while (picked.length < n && pool.length) {
+  let points = 0;
+  while (pool.length && picked.length < want && (cap === null || points < cap)) {
     const choice = weighted(pool, (item) => item.sessions);
     pool.splice(pool.indexOf(choice), 1);
-    picked.push({ moveId: choice.moveId, sets: choice.sets, reps: choice.reps, kg: choice.kg });
+    const row = { moveId: choice.moveId, sets: choice.sets, reps: choice.reps, kg: choice.kg };
+    picked.push(row);
+    points += accessoryPoints(row);
   }
   return picked;
 }
 
-/* A day's starting rows: the barbell shortcut for that slot, plus an accessory
-   block. Both are replaceable; this is only what you arrive to. */
-export function rowsForDay(preset, oneRM = {}, seed = 0) {
-  return [...rowsForPreset(preset, oneRM), ...drawAccessory(seed)];
+/* Which shortcuts can be done where you are. A barbell block is not available
+   in a park, so the list the interface offers has to be filtered rather than
+   the choice quietly producing work you cannot do. */
+export function presetsFor(env) {
+  return Object.keys(PRESET_ROWS).filter(
+    (id) => PRESET_ROWS[id].every((row) => rowAvailable(row, env)),
+  );
+}
+
+/* The most substantial barbell block a place can support, used when the one
+   you had is not available there. A park keeps weighted pull-ups rather than
+   dropping to nothing at all; a living room has no answer and gets "none". */
+export function bestPresetFor(env) {
+  return presetsFor(env).reduce(
+    (best, id) => (PRESET_ROWS[id].length > PRESET_ROWS[best].length ? id : best),
+    "none",
+  );
+}
+
+/* A day's starting rows: the barbell shortcut for that slot if the place you
+   are training has the equipment for it, plus an accessory block sized for
+   what is left. Both are replaceable; this is only what you arrive to. */
+export function rowsForDay(preset, oneRM = {}, seed = 0, env = "gym") {
+  const usable = presetsFor(env).includes(preset) ? preset : bestPresetFor(env);
+  const lifts = rowsForPreset(usable, oneRM);
+  /* The budget covers the barbell block and the accessory block together, so
+     whatever the lifts already deliver is not asked of the accessories again. */
+  const total = PRE_BUDGET[env] ?? null;
+  const budget = total === null ? null
+    : Math.max(0, total - arrivingFromLifts(lifts.map((row) => ({ ...row, pct: pctFor(row, oneRM) }))).points);
+  return [...lifts, ...drawAccessory(seed, env, budget)];
 }
 
 const rowKey = (row) => `${row.liftId || row.moveId}:${row.sets}x${row.reps}`;
@@ -101,13 +167,28 @@ export function withPreset(rows, id, oneRM = {}) {
   return [...rowsForPreset(id, oneRM), ...splitRows(rows).accessory];
 }
 
+/* Rebuild a day for a different place to train. What you had selected for the
+   gym is not available in a park, so it is replaced rather than shown as
+   something you could do.
+
+   `preset` is the block you asked for, which is not always the block you can
+   have: the same distinction the effort control already makes between "auto"
+   and what auto resolved to. Keeping the request rather than reading it back
+   off the rows is what lets a squat day survive a trip to the park and come
+   home again. The accessory draw is seeded on the day, so the gym block you
+   come back to is the one you left. */
+export function rowsForEnv(preset, env, oneRM = {}, seed = 0) {
+  return rowsForDay(preset, oneRM, seed, env);
+}
+
 export function defaultWeekConfig(count = 2, oneRM = {}, seed = 0) {
   const safeCount = weekCount(count);
   return SCHEDULES[safeCount].map((weekday, index) => ({
     weekday,
     env: "gym",
     intensity: "auto",
-    rows: rowsForDay(FOCUS[safeCount][index], oneRM, daySeed(seed, index)),
+    preset: FOCUS[safeCount][index],
+    rows: rowsForDay(FOCUS[safeCount][index], oneRM, daySeed(seed, index), "gym"),
     locks: [],
     swaps: [],
     nonce: 0,
@@ -189,11 +270,21 @@ export function normaliseWeek(configs, count, { oneRM = {}, liftRows = null, see
       || (PRESET_ROWS[config?.focus] ? rowsForPreset(config.focus, oneRM) : null)
       || fallback.rows;
     const nonce = Number(config?.nonce);
+    const env = ENVS.includes(config?.env) ? config.env : fallback.env;
+    /* The block you asked for, kept even where it cannot be done, so leaving a
+       park restores what you had rather than what the park allowed. */
+    const preset = PRESET_ROWS[config?.preset] ? config.preset
+      : (config?.focus && PRESET_ROWS[config.focus]) ? config.focus
+        : presetFor(rows) === "custom" ? fallback.preset : presetFor(rows);
+    /* A barbell row saved for a gym day is not something you can do in a park,
+       so it does not survive being read back for one. */
+    const usable = rows.filter((row) => rowAvailable(row, env));
     return {
       weekday: Number.isInteger(weekday) && weekday >= 0 && weekday <= 6 ? weekday : fallback.weekday,
-      env: ENVS.includes(config?.env) ? config.env : fallback.env,
+      env,
+      preset,
       intensity: INTENSITY_IDS.has(config?.intensity) ? config.intensity : fallback.intensity,
-      rows,
+      rows: usable,
       locks: cleanLocks(config?.locks),
       swaps: cleanSwaps(config?.swaps),
       nonce: Number.isFinite(nonce) ? nonce : 0,
@@ -249,7 +340,9 @@ function chooseSession(config, context) {
       excludeMoves: context.excludeMoves,
       excludeFormats: context.excludeFormats,
     });
-    return wod ? { wod, intensity: choice.id, distance: Math.abs(sessionLoad(wod).total - TARGET_DAY_LOAD) } : null;
+    return wod
+      ? { wod, intensity: choice.id, distance: Math.abs(sessionLoad(wod).total - targetFor(config.env)) }
+      : null;
   }).filter(Boolean);
 
   candidates.sort((a, b) => a.distance - b.distance
@@ -334,6 +427,7 @@ export function planWeek(configs, { seed = 1, oneRM = {} } = {}) {
       requestedIntensity: config.intensity,
       intensity: chosen.intensity,
       preset: presetFor(strengthRows),
+      requestedPreset: config.preset,
       carry,
       carryPoints: Object.values(carry).reduce((sum, value) => sum + value, 0),
       seed: daySeed(seed, index, config.nonce),

@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import {
-  daySeed, defaultWeekConfig, drawAccessory, editWeekDay, normaliseWeek, planWeek, presetFor,
-  rowsForPreset, weekSummary, withPreset,
+  bestPresetFor, daySeed, defaultWeekConfig, drawAccessory, editWeekDay, normaliseWeek, planWeek,
+  presetFor, presetsFor, rowsForDay, rowsForEnv, rowsForPreset, targetFor, weekSummary, withPreset,
 } from "../src/planner.js";
 import { sessionLoad } from "../src/generator.js";
 import { FORMATS } from "../src/formats.js";
 import { ladderRungs } from "../src/text.js";
-import { accessoryById, accessoryPoints, accessoryRepMax, moveById, splitRows } from "../src/lifts.js";
+import {
+  accessoryById, accessoryPoints, accessoryRepMax, moveById, rowAvailable, splitRows,
+} from "../src/lifts.js";
 import { CORPUS_DEFAULTS } from "../src/corpus.js";
+import { PRESET_ROWS } from "../src/lifts.js";
 
 const shape = (plan) => plan.map((wod) => ({
   format: wod.fmt.id,
@@ -50,7 +53,7 @@ assert.notDeepEqual(shape(changedSeed), shape(planWeek(defaultWeekConfig(2), { s
    against the list that owns it, so nothing unknown reaches the generator. */
 const stale = normaliseWeek(
   [{ weekday: 9, env: "moon", focus: "cardio", intensity: "brutal" },
-   { weekday: 4, env: "casa", focus: "press", intensity: "hard" }],
+   { weekday: 4, env: "gym", focus: "press", intensity: "hard" }],
   2,
 );
 assert.equal(stale[0].weekday, 1, "an unusable saved day falls back to the default for its slot");
@@ -58,9 +61,66 @@ assert.equal(stale[0].env, "gym");
 assert.equal(stale[0].intensity, "auto");
 assert.equal(presetFor(stale[0].rows), "lower", "and to that slot's default strength rows");
 assert.equal(stale[1].weekday, 4, "a valid saved day is kept exactly");
-assert.equal(stale[1].env, "casa");
+assert.equal(stale[1].env, "gym");
 assert.equal(stale[1].intensity, "hard");
 assert.equal(presetFor(stale[1].rows), "press", "a saved focus id migrates into stored rows");
+
+/* Where you train decides the whole session, not just the conditioning piece.
+   A barbell is not available in a park, so the block you asked for is kept as
+   a request while the day shows what that place can actually give you, and
+   coming back restores it. */
+for (const env of ["gym", "parque", "casa"]) {
+  for (const preset of presetsFor(env)) {
+    for (const row of PRESET_ROWS[preset]) {
+      assert(rowAvailable(row, env), `${preset} is only offered where ${row.liftId} can be done`);
+    }
+  }
+  for (const row of rowsForDay("full", {}, 3, env)) {
+    assert(rowAvailable(row, env), `a day built for ${env} contains only what ${env} can do`);
+  }
+}
+assert.deepEqual(presetsFor("casa"), ["none"], "a living room supports no barbell block");
+assert.equal(bestPresetFor("parque"), "pull", "a park keeps weighted pull-ups rather than nothing");
+
+const trip = ["parque", "casa", "gym"].reduce(
+  (rows, env) => rowsForEnv("lower", env, { back_squat: 130, rdl: 110 }, 7),
+  rowsForDay("lower", { back_squat: 130, rdl: 110 }, 7, "gym"),
+);
+assert.equal(presetFor(trip), "lower", "the gym block comes back after a trip to the park and home");
+
+/* Effort targets differ by environment, and each is reachable there. */
+assert(targetFor("gym") > targetFor("parque"), "a gym day is worth more than a park day");
+assert(targetFor("parque") >= targetFor("casa"));
+for (const env of ["gym", "parque", "casa"]) {
+  const loads = [];
+  for (let seed = 1; seed <= 250; seed += 1) {
+    const preset = bestPresetFor(env);
+    const rows = rowsForDay(preset, { back_squat: 130, bench: 90, weighted_pullup: 20, barbell_row: 80 }, seed, env);
+    const [wod] = planWeek(
+      normaliseWeek([{ weekday: 1, env, preset, intensity: "auto", rows }], 1), { seed },
+    );
+    if (wod) loads.push(sessionLoad(wod).total);
+  }
+  loads.sort((a, b) => a - b);
+  const median = loads[loads.length >> 1];
+  assert(Math.abs(median - targetFor(env)) < 120,
+    `${env} should land near its ${targetFor(env)}-point target, median was ${Math.round(median)}`);
+}
+
+/* A day saved for the gym cannot be read back for a park: a barbell block is
+   not something you can do there, so it does not survive the round trip. */
+const awayFromGym = normaliseWeek(
+  [{ weekday: 1, env: "casa", focus: "press", intensity: "auto" },
+   { weekday: 3, env: "parque", focus: "full", intensity: "auto" }],
+  2,
+);
+assert.equal(splitRows(awayFromGym[0].rows).lifts.length, 0, "no barbell survives being read back at home");
+assert.equal(splitRows(awayFromGym[1].rows).lifts.length, 0, "nor a full barbell block in a park");
+for (const day of awayFromGym) {
+  for (const row of day.rows) {
+    assert(rowAvailable(row, day.env), `${row.liftId || row.moveId} must be doable at ${day.env}`);
+  }
+}
 
 for (const count of [2, 3, 4, 5]) {
   const week = normaliseWeek(Array(count).fill({ weekday: 3, env: "gym", focus: "squat", intensity: "auto" }), count);

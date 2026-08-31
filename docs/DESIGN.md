@@ -511,3 +511,29 @@ Measured over 4000 draws against the log's own 28 accessory blocks: size 65/18/1
 ## The actions moved to the top of the card
 
 They were below the axis meter, which on a phone put the buttons a full screen of scrolling below the workout. They are the most-used part of the app: "Another" is how you use the generator at all, and Copy is how the session leaves it. The card now opens with them.
+
+## Where you train decides the whole session
+
+Until now `env` gated the conditioning piece and nothing else. The barbell grid offered a back squat at home and a bench press in a park, and a saved gym block came back unchanged when you switched, which made the control read as a filter on one third of the session rather than a statement about where you are.
+
+The gap was in the data. `MOVES` has always carried `env`; `LIFTS` had no such field, so nothing knew a barbell needs a gym. Adding it settles the question in the place that owns it: eleven lifts are gym-only, and `weighted_pullup` is the one exception, needing something to hang from rather than a loaded bar, which a park has. Everything else follows from that one field. `liftsFor()`, `accessoriesFor()` and `presetsFor()` decide what the interface offers, `rowAvailable()` decides what survives being read back out of storage, and `rowsForEnv()` rebuilds a day when you move.
+
+### Asked for, and got
+
+Switching to a park and back has to return the session you left, and the first attempt did not: rebuilding read the block off the rows, so a squat day became a pull-up day in the park and then stayed a pull-up day back at the gym. Reading intent off a result loses the intent.
+
+The app already had the right pattern for this. `config.intensity` can say `auto` while `plan.intensity` records the step auto chose. A day now stores `preset` the same way: what you asked for, kept even where it cannot be done, while `presetFor(rows)` reports what the place actually gave you. A squat day shows pull-ups in the park, nothing at home, and squats again when you get back.
+
+### What a good day is worth depends on where you are
+
+One `TARGET_DAY_LOAD` of 310 for all three environments was both timid at the gym and unreachable at home. Measured over 1500 sessions per case: a gym day with a full barbell block runs to a median of 377 points at normal effort and 427 at hard; a park day with weighted pull-ups to 272 and 318; a session with no loadable movement at all to 177 and 240.
+
+The targets are now 450, 350 and 320, each chosen against those numbers rather than for how they read. What lands, with the default block for each place and automatic effort: gym median 394 with a p90 of 455, park 336, home 314.
+
+### The accessory block does the barbell's work when there is no barbell
+
+Sizing the accessory block per environment was the first attempt and it produced a park day worth 468 points, more than the gym. The budget had assumed a park has no strength block, but a park has weighted pull-ups, and a 5x5 at 80% is 133 points on its own.
+
+`PRE_BUDGET` covers the barbell block and the accessory block together, so the accessories are only asked for what the lifts do not already deliver: a park day keeping weighted pull-ups draws about one accessory movement, one with no barbell draws five. At the gym the budget is `null`, meaning the accessory block keeps the size the source log gives it, because there the barbell is doing the work and the log has real data about it. The park and home figures have no such backing and are labelled a product choice, as every session in the log was a gym session.
+
+What this does not fix: a living room still has no pulling movement at all, which is why the `nopull` warning is nearly universal there. That remains a gap in `MOVES`, and the fix is a movement rather than a coefficient.

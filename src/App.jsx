@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, STRENGTH, cueFor } from "./formats.js";
 import {
-  ACCESSORY, LIFTS, accessoryRepMax, defaultAccessoryRow, moveById, pctFor, splitRows,
+  accessoriesFor, accessoryRepMax, defaultAccessoryRow, liftsFor, moveById, pctFor, splitRows,
 } from "./lifts.js";
 import { T } from "./i18n.js";
 import { sessionLoad } from "./generator.js";
@@ -10,8 +10,8 @@ import { asText, headline, repParts, strengthLine } from "./text.js";
 import { platesFor } from "./plates.js";
 import { loadPref, savePref } from "./prefs.js";
 import {
-  daySeed, defaultWeekConfig, drawAccessory, editWeekDay, normaliseWeek, planWeek, weekCount,
-  weekSummary, withPreset,
+  daySeed, defaultWeekConfig, drawAccessory, editWeekDay, normaliseWeek, planWeek, presetsFor,
+  rowsForEnv, weekCount, weekSummary, withPreset,
 } from "./planner.js";
 import WeekPlanner from "./WeekPlanner.jsx";
 
@@ -334,7 +334,7 @@ export default function App() {
     patchDay({
       nonce,
       swaps: [],
-      rows: [...splitRows(config.rows).lifts, ...drawAccessory(daySeed(weekSeed, index, nonce))],
+      rows: [...splitRows(config.rows).lifts, ...drawAccessory(daySeed(weekSeed, index, nonce), config.env)],
     });
   };
 
@@ -344,7 +344,7 @@ export default function App() {
     setWeekSeed(next);
     setConfigs((current) => current.map((c, i) => ({
       ...c,
-      rows: [...splitRows(c.rows).lifts, ...drawAccessory(daySeed(next, i, c.nonce))],
+      rows: [...splitRows(c.rows).lifts, ...drawAccessory(daySeed(next, i, c.nonce), c.env)],
     })));
   };
 
@@ -364,7 +364,7 @@ export default function App() {
     : r)));
 
   // A shortcut swaps the barbell block and leaves the accessory work alone.
-  const applyPreset = (id) => setRows(withPreset(liftRows, id, oneRM));
+  const applyPreset = (id) => patchDay({ preset: id, rows: withPreset(liftRows, id, oneRM) });
 
   const isLocked = (moveId) => (config.locks || []).some((l) => l.moveId === moveId);
   const toggleLock = (moveId) => {
@@ -495,7 +495,10 @@ export default function App() {
               <p className="lbl">{t.where}</p>
               <div className="chips">
                 {ENVS.map((e) => (
-                  <button key={e} className="chip" aria-pressed={env === e} onClick={() => patchDay({ env: e })}>
+                  <button key={e} className="chip" aria-pressed={env === e} onClick={() => patchDay({
+                      env: e,
+                      rows: rowsForEnv(config.preset, e, oneRM, daySeed(weekSeed, index, config.nonce)),
+                    })}>
                     <b>{t[e]}</b><span>{t.whereHint[e]}</span>
                   </button>
                 ))}
@@ -519,7 +522,7 @@ export default function App() {
               <p className="lbl">{t.before}</p>
 
               <div className="shortcuts">
-                {STRENGTH.map((sp) => (
+                {STRENGTH.filter((sp) => presetsFor(env).includes(sp.id)).map((sp) => (
                   <button key={sp.id} className="scut" onClick={() => applyPreset(sp.id)}>
                     {t.strength[sp.id]}
                   </button>
@@ -528,7 +531,7 @@ export default function App() {
 
               <p className="grp">{t.mainLifts}</p>
               <ul className="lifts">
-                {LIFTS.map((lift) => {
+                {liftsFor(env).map((lift) => {
                   const row = findRow(lift.id);
                   const rm = oneRM[lift.id] || 0;
                   const pct = row ? pctFor(row, oneRM) : undefined;
@@ -564,7 +567,7 @@ export default function App() {
 
               <p className="grp">{t.accessory}</p>
               <ul className="lifts">
-                {ACCESSORY.map((acc) => {
+                {accessoriesFor(env).map((acc) => {
                   const move = moveById(acc.moveId);
                   const row = findRow(acc.moveId);
                   return (
