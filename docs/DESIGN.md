@@ -384,3 +384,24 @@ Adjacent days exclude the previous format and movements. These are preferences, 
 One week seed derives one stable seed per day. Editing strength or effort therefore preserves the existing formats and movements and updates reps and downstream carry. Changing environment can replace movements because availability changed. "Another week" is the explicit redraw.
 
 `npm run check:planner` verifies deterministic 2, 3, 4, and 5-day plans, adjacent diversity in the gym pool, nonzero carry-over, load accounting, and a changed result from a changed week seed.
+
+## The schedule became a control
+
+The planner shipped with the weekday as the one fact it read and the one fact you could not set. `editDay` already handled a `weekday` field and nothing ever called it; the cadence came from `SCHEDULES` and stayed there. That is an odd gap for this feature in particular, because the calendar gap is the entire input to carry-over: the same two sessions on Monday and Tuesday and on Monday and Thursday are different weeks, and only one of them was reachable.
+
+The weekday is now a select in the card heading rather than a fourth control in the row below it. The heading already displayed the weekday, so making it the control keeps one place on screen for one fact instead of showing it twice.
+
+Two constraints follow from what the model actually reads:
+
+- **The week re-sorts on every edit.** `planWeek()` walks the configs in order and computes each gap as `(weekday - previous + 7) % 7`. Out of order, a Wednesday following a Friday reads as five days later rather than two days earlier, and the reported carry-over is not the week on screen.
+- **One session per weekday.** With two days on the same weekday the gap expression falls through to `|| 7`, so the second session would arrive as though a full week had passed. Two-a-days are a real thing and this model does not describe them, so the select hides a day already spoken for rather than quietly mispricing it.
+
+## A dropped day used to shift every card after it
+
+`planWeek()` ends in `.filter(Boolean)`, because a day whose config the generator cannot satisfy returns null rather than failing the week. The interface then paired `plan[i]` with `configs[i]`. Those are the same index only while nothing drops.
+
+The reachable cause was a saved preference. `weekConfigs` persists to `localStorage`, so a config written by one build is read back by the next; an `env` that no longer exists reaches `poolFor()`, every pool comes back empty, `buildCandidate` returns null 300 times, and the day disappears. Every later card then rendered one day's workout above another day's controls, and editing those controls wrote to the wrong day.
+
+Fixed at both ends. `planWeek()` records `index` on `wod.plan`, so a card can find the config that produced it whatever its position; and `normaliseWeek()` checks every saved field against the list that owns it, so the stale value never reaches the generator in the first place. The first is the invariant, the second is the cause. `npm run check:planner` covers both, including a deliberately unbuildable day.
+
+This is also why `moves.js` now exports `ENVS`. The three environments were a comment in the header, a literal in `App.jsx`, another in `WeekPlanner.jsx`, and a fourth in `smoke.js`. Validation needs a list that owns the fact.

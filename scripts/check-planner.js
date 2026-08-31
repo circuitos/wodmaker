@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { defaultWeekConfig, planWeek, weekSummary } from "../src/planner.js";
+import { defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, weekSummary } from "../src/planner.js";
 import { sessionLoad } from "../src/generator.js";
 import { FORMATS } from "../src/formats.js";
 
@@ -39,5 +39,38 @@ for (const count of [2, 3, 4, 5]) {
 const changedSeed = planWeek(defaultWeekConfig(2), { seed: 7 });
 assert.notDeepEqual(shape(changedSeed), shape(planWeek(defaultWeekConfig(2), { seed: 8 })),
   "Another week must produce a different plan");
+
+/* A saved preference outlives the build that wrote it. Every field is checked
+   against the list that owns it, so nothing unknown reaches the generator. */
+const stale = normaliseWeek(
+  [{ weekday: 9, env: "moon", focus: "cardio", intensity: "brutal" },
+   { weekday: 4, env: "casa", focus: "press", intensity: "hard" }],
+  2,
+);
+assert.deepEqual(stale[0], { weekday: 1, env: "gym", focus: "lower", intensity: "auto" },
+  "an unusable saved day falls back to the default for its slot");
+assert.deepEqual(stale[1], { weekday: 4, env: "casa", focus: "press", intensity: "hard" },
+  "a valid saved day is kept exactly");
+
+for (const count of [2, 3, 4, 5]) {
+  const week = normaliseWeek(Array(count).fill({ weekday: 3, env: "gym", focus: "squat", intensity: "auto" }), count);
+  const weekdays = week.map((day) => day.weekday);
+  assert.equal(new Set(weekdays).size, count, "one session per weekday");
+  assert.deepEqual(weekdays, [...weekdays].sort((a, b) => a - b), "a week is stored in calendar order");
+}
+
+const moved = editWeekDay(defaultWeekConfig(3), 2, "weekday", 2);
+assert.deepEqual(moved.map((day) => day.weekday), [1, 2, 3], "moving a day re-sorts the week");
+assert.equal(moved[1].focus, "deadlift", "the moved day keeps its own strength focus");
+
+/* A day the generator cannot build drops out of the plan, so plan.index, not
+   position, is what pairs a card with the schedule row that produced it. */
+const gappy = defaultWeekConfig(3).map((day, i) => (i === 0 ? { ...day, env: "moon" } : day));
+const partial = planWeek(gappy, { seed: 20260831 });
+assert.equal(partial.length, 2, "an unbuildable day drops out rather than failing the week");
+for (const wod of partial) {
+  assert.equal(wod.plan.weekday, gappy[wod.plan.index].weekday, "plan.index points at the day that built it");
+  assert.equal(wod.plan.env, gappy[wod.plan.index].env);
+}
 
 console.log("Planner check passed for deterministic 2, 3, 4, and 5-day weeks.");

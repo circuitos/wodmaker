@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { AXES } from "./moves.js";
+import { AXES, ENVS } from "./moves.js";
 import { CUES, INTENSITY, STRENGTH, intensityK } from "./formats.js";
 import { ACCESSORY, LIFTS, PRESET_ROWS, arrivingFromLifts, moveById, pctFor } from "./lifts.js";
 import { T } from "./i18n.js";
@@ -192,7 +192,12 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
 @media(min-width:760px){.week-days{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .day-card{background:#fff;border:1.5px solid var(--ink);box-shadow:3px 3px 0 rgba(20,23,26,.08)}
 .day-head{display:flex;align-items:flex-end;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--rule)}
-.day-head h2{font-size:27px;margin:2px 0 0}.day-kicker{font-size:9px;letter-spacing:.12em;color:var(--ink-2);text-transform:uppercase}
+.day-head h2{font-size:27px;margin:2px 0 0}
+.day-when{margin:2px 0 0;padding:0 18px 0 0;border:0;background:transparent;color:var(--ink);
+  font-size:27px;line-height:1.1;cursor:pointer;appearance:none;-webkit-appearance:none}
+.day-when{background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);
+  background-position:right 6px top 15px,right 1px top 15px;background-size:5px 5px;background-repeat:no-repeat}
+.day-when:hover{color:var(--red)}.day-kicker{font-size:9px;letter-spacing:.12em;color:var(--ink-2);text-transform:uppercase}
 .day-load{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700}.day-load::after{content:' pts';font-size:10px;color:var(--ink-2)}
 .day-config{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;padding:10px 12px;background:#FAFAF7;border-bottom:1px solid var(--rule)}
 .day-config label>span{display:block;margin-bottom:3px;font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)}
@@ -412,7 +417,7 @@ export default function App() {
             <div className="block">
               <p className="lbl">{t.where}</p>
               <div className="chips">
-                {["gym", "parque", "casa"].map((e) => (
+                {ENVS.map((e) => (
                   <button key={e} className="chip" aria-pressed={env === e} onClick={() => setEnv(e)}>
                     <b>{t[e]}</b><span>{t.whereHint[e]}</span>
                   </button>

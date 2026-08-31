@@ -15,7 +15,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { AXES } from "../src/moves.js";
+import { AXES, ENVS } from "../src/moves.js";
 import { FORMATS, STRENGTH } from "../src/formats.js";
 import { arrivingFromPreset } from "../src/lifts.js";
 import { generate, mulberry32, sessionLoad } from "../src/generator.js";
@@ -23,7 +23,6 @@ import { generate, mulberry32, sessionLoad } from "../src/generator.js";
 const SAMPLES = Number(process.env.SAMPLES || 400);
 const SEED = Number(process.env.SEED || 1);
 const OUT = process.env.OUT || "out/smoke-report.md";
-const ENVS = ["gym", "parque", "casa"];
 
 // Swap in the same seeded PRNG generate() itself uses for a single seeded
 // call, but install it globally here so the whole sweep is one reproducible

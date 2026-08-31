@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AXES } from "./moves.js";
+import { AXES, ENVS } from "./moves.js";
 import { CUES, INTENSITY, STRENGTH } from "./formats.js";
 import { T } from "./i18n.js";
 import { sessionLoad } from "./generator.js";
-import { defaultWeekConfig, planWeek, weekSummary } from "./planner.js";
+import { WEEK_COUNTS, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, weekCount, weekSummary }
+  from "./planner.js";
 import { loadPref, savePref } from "./prefs.js";
 import { asText, headline, repLine, strengthLine } from "./text.js";
 
@@ -12,19 +13,20 @@ function cueFor(wod, lang) {
   return cues[wod.plan.seed % cues.length];
 }
 
+const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
+
 function weekdayName(t, weekday) {
   return t.planner.weekdays[weekday];
 }
 
 export default function WeekPlanner({ lang, oneRM, customRows }) {
   const t = T[lang];
-  const [count, setCount] = useState(() => loadPref("weekCount", 2));
-  const [configs, setConfigs] = useState(() => {
-    const saved = loadPref("weekConfigs", null);
-    return Array.isArray(saved) && saved.length === Number(loadPref("weekCount", 2))
-      ? saved
-      : defaultWeekConfig(loadPref("weekCount", 2));
-  });
+  const [count, setCount] = useState(() => weekCount(loadPref("weekCount", 2)));
+  /* Whatever was saved is checked against the lists that own each field, so a
+     preference written by an older build cannot reach the generator. */
+  const [configs, setConfigs] = useState(
+    () => normaliseWeek(loadPref("weekConfigs", null), weekCount(loadPref("weekCount", 2))),
+  );
   const [seed, setSeed] = useState(() => loadPref("weekSeed", Math.floor(Math.random() * 2 ** 31)));
   const [copied, setCopied] = useState(false);
 
@@ -37,15 +39,18 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
     [configs, seed, oneRM, customRows],
   );
   const summary = useMemo(() => weekSummary(plan), [plan]);
+  /* One session per weekday: the gap between days is what carry-over decays
+     over, so a day already spoken for is not offered twice. */
+  const taken = useMemo(() => new Set(configs.map((config) => config.weekday)), [configs]);
 
   const changeCount = (next) => {
     setCount(next);
     setConfigs(defaultWeekConfig(next));
   };
 
-  const editDay = (index, field, value) => setConfigs((current) => current.map((config, i) => (
-    i === index ? { ...config, [field]: field === "weekday" ? Number(value) : value } : config
-  )));
+  const editDay = (index, field, value) => setConfigs(
+    (current) => editWeekDay(current, index, field, value),
+  );
 
   const text = useMemo(() => [
     `${t.planner.title} · ${Math.round(summary.total)} ${t.planner.points}`,
@@ -89,7 +94,7 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
         <div>
           <p className="lbl">{t.planner.sessions}</p>
           <div className="seg week-count">
-            {[2, 3, 4, 5].map((value) => (
+            {WEEK_COUNTS.map((value) => (
               <button key={value} aria-pressed={count === value} onClick={() => changeCount(value)}>{value}</button>
             ))}
           </div>
@@ -112,7 +117,11 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
       </div>
 
       <div className="week-days">
-        {plan.map((wod, index) => {
+        {plan.map((wod, position) => {
+          /* A day the generator could not build drops out of the plan, so the
+             card has to follow the index the planner recorded rather than its
+             own position, or every later card edits the wrong schedule row. */
+          const index = wod.plan.index;
           const config = configs[index];
           const load = sessionLoad(wod);
           const cue = cueFor(wod, lang);
@@ -120,8 +129,16 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
             <article className="day-card" key={`${index}-${config.weekday}`}>
               <header className="day-head">
                 <div>
-                  <span className="day-kicker mono">{t.planner.day} {index + 1}</span>
-                  <h2 className="disp">{weekdayName(t, config.weekday)}</h2>
+                  <span className="day-kicker mono">{t.planner.day} {position + 1}</span>
+                  <select className="day-when disp" aria-label={t.planner.weekday} value={config.weekday}
+                    onChange={(event) => editDay(index, "weekday", event.target.value)}>
+                    {WEEKDAYS.map((weekday) => (
+                      <option key={weekday} value={weekday}
+                        disabled={weekday !== config.weekday && taken.has(weekday)}>
+                        {weekdayName(t, weekday)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <span className="day-load mono">{Math.round(load.total)}</span>
               </header>
@@ -137,7 +154,7 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
                 <label>
                   <span>{t.where}</span>
                   <select value={config.env} onChange={(event) => editDay(index, "env", event.target.value)}>
-                    {['gym', 'parque', 'casa'].map((env) => <option key={env} value={env}>{t[env]}</option>)}
+                    {ENVS.map((env) => <option key={env} value={env}>{t[env]}</option>)}
                   </select>
                 </label>
                 <label>
@@ -171,8 +188,8 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
                   {wod.items.map((item, itemIndex) => (
                     <li key={item.move.id}>
                       {wod.fmt.id === "emom" && <span className="mono">Min {itemIndex + 1}</span>}
-                      <strong className="mono">{wod.fmt.id === "ladder" ? "10-2" : repLine(item, lang, config.env).split(" ")[0]}</strong>
-                      <span>{wod.fmt.id === "ladder" ? item.move[lang] : repLine(item, lang, config.env).split(" ").slice(1).join(" ")}</span>
+                      <strong className="mono">{wod.fmt.id === "ladder" ? "10-2" : repLine(item, lang, wod.plan.env).split(" ")[0]}</strong>
+                      <span>{wod.fmt.id === "ladder" ? item.move[lang] : repLine(item, lang, wod.plan.env).split(" ").slice(1).join(" ")}</span>
                     </li>
                   ))}
                   {wod.fmt.id === "emom" && wod.items.length === 3 && (

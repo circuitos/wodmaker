@@ -149,3 +149,7 @@ export const MOVES = [
 
 
 export const AXES = ["piernas", "posterior", "empuje", "traccion", "core", "agarre"];
+
+/* Where you can train. One owner for the list, so a saved preference can be
+   checked against it rather than trusted. */
+export const ENVS = ["gym", "parque", "casa"];

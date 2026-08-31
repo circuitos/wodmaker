@@ -1,4 +1,4 @@
-import { AXES } from "./moves.js";
+import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, intensityK } from "./formats.js";
 import { generate, sessionAxisLoad, sessionLoad } from "./generator.js";
 import { PRESET_ROWS, arrivingFromAxis, arrivingFromLifts, pctFor } from "./lifts.js";
@@ -25,14 +25,62 @@ const FOCUS = {
   5: ["squat", "press", "deadlift", "pull", "none"],
 };
 
+export const WEEK_COUNTS = [2, 3, 4, 5];
+
+export function weekCount(count) {
+  return WEEK_COUNTS.includes(Number(count)) ? Number(count) : 2;
+}
+
 export function defaultWeekConfig(count = 2) {
-  const safeCount = Math.max(2, Math.min(5, Number(count) || 2));
+  const safeCount = weekCount(count);
   return SCHEDULES[safeCount].map((weekday, index) => ({
     weekday,
     env: "gym",
     focus: FOCUS[safeCount][index],
     intensity: "auto",
   }));
+}
+
+const FOCUS_IDS = new Set([...Object.keys(PRESET_ROWS), "custom"]);
+const INTENSITY_IDS = new Set(["auto", ...INTENSITY.map((step) => step.id)]);
+
+/* A week is one session per weekday, in calendar order. The gap between two
+   days is what carry-over decays over, so a duplicated or out-of-order day
+   would report a fatigue figure the week does not actually produce. */
+function orderWeek(configs) {
+  const used = new Set();
+  return configs.map((config) => {
+    let { weekday } = config;
+    while (used.has(weekday)) weekday = (weekday + 1) % 7;
+    used.add(weekday);
+    return { ...config, weekday };
+  }).sort((a, b) => a.weekday - b.weekday);
+}
+
+/* Saved preferences outlive the code that wrote them. A stale environment or
+   focus id used to reach the generator, produce no candidate, and silently
+   drop that day out of the week. Every field is checked against the list that
+   owns it, falling back to the default for that slot. */
+export function normaliseWeek(configs, count) {
+  const defaults = defaultWeekConfig(count);
+  return orderWeek(defaults.map((fallback, index) => {
+    const config = Array.isArray(configs) ? configs[index] : null;
+    const weekday = Number(config?.weekday);
+    return {
+      weekday: Number.isInteger(weekday) && weekday >= 0 && weekday <= 6 ? weekday : fallback.weekday,
+      env: ENVS.includes(config?.env) ? config.env : fallback.env,
+      focus: FOCUS_IDS.has(config?.focus) ? config.focus : fallback.focus,
+      intensity: INTENSITY_IDS.has(config?.intensity) ? config.intensity : fallback.intensity,
+    };
+  }));
+}
+
+/* Moving one day rewrites the order, because the schedule is the thing the
+   carry-over model reads. */
+export function editWeekDay(configs, index, field, value) {
+  return orderWeek(configs.map((config, i) => (
+    i === index ? { ...config, [field]: field === "weekday" ? Number(value) : value } : config
+  )));
 }
 
 export function daySeed(seed, index) {
@@ -115,6 +163,10 @@ export function planWeek(configs, { seed = 1, oneRM = {}, customRows = [] } = {}
     wod.strengthRows = strengthRows;
     wod.oneRM = oneRM;
     wod.plan = {
+      /* Which config built this day. A day that cannot be built drops out of
+         the returned array, so position in the plan is not position in the
+         schedule and the interface must not assume it is. */
+      index,
       weekday: config.weekday,
       env: config.env,
       focus: config.focus,
