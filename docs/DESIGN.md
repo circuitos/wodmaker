@@ -79,6 +79,8 @@ Three things the sweep found that reading the code did not.
 
 This does not have to be fixed to unify the model, and it should not be fixed in the same commit. Step 3 preserves whatever the clamps do today by construction, because it sets each format's `load` to the current band midpoint times the current pass count. Worth a separate decision afterwards: either raise the EMOM band to something reachable, or accept that quantisation is the real floor and say so.
 
+**Resolved as week-planner groundwork.** The band was not the real mistake. `passes` said every EMOM item happened once per minute, so a 12-minute, four-movement piece multiplied all four movements by 12 instead of by 3. The generator then divided the session target by that same 12, asked for an impossibly small movement list, and hit the quantisation floors described above. `emomPasses()` now uses `cap / cycle`: two movements repeat five times in ten minutes; four repeat three times in twelve; three work movements also repeat three times because the card renders minute four as rest. The 8400-workout sweep moves EMOM conditioning from a 226-point mean and 748-point maximum full session to 130 and 387. Hard faults remain zero.
+
 **The `nopull` warning fires on 93.7% of home workouts.** Not 31% as the overall count suggests: it is zero at the gym and in the park, and nearly universal at home. A warning that fires on almost every session in its category carries no information, so today it reads as decoration. `CLAUDE.md` already names the cause in its gotchas: there is no home-friendly pulling movement in `MOVES`, and the fix is a movement, not a scorer tweak. The number just says how bad it is.
 
 **Nothing ever degrades.** Zero of 8400 workouts came back carrying a hard fault, so the 300-candidate loop in `generate()` always finds a clean one. The fallback path exists and is correct, but it has never been the thing that runs. Good to know before trusting it to absorb anything.
@@ -153,7 +155,7 @@ Two float details, checked rather than assumed. `fortime` at 3 rounds now comput
 
 **The multipliers are calibrated against what they deliver rather than what they read.** Asking for 0.8 does not produce 80% of the work: `quantise` floors every movement at half its minimum dose and `buildCandidate` clamps rep scaling at 0.55, so about 60% of the request survives. Measured over 3000 workouts a step, 0.6 gives -16% and 1.4 gives +24%, a 1.47x span from soft to hard, or 7.7 against 11.3 hard minutes.
 
-The asymmetry is a fact rather than an oversight. Reps can be scaled up but the floors stop them going down, so about -16% is the softest this mechanism reaches at all. A genuinely light session would need fewer movements or fewer rounds, which is a different change and not one this commit makes. It is the same clamp that makes the EMOM band unreachable, showing up in a second place.
+The asymmetry is a fact rather than an oversight. Reps can be scaled up but the floors stop them going down, so about -16% is the softest this mechanism reaches at all. A genuinely light session would need fewer movements or fewer rounds, which is a different change and not one this commit makes.
 
 **5. Generalise `pre` from a strength block to an arriving axis load.** Groundwork for the week planner, per the section above. Its own commit, after the load model is unified, and before any planner work starts.
 
@@ -332,7 +334,7 @@ Section 5 keeps one seed in a ref (`seedRef`, not state: reading it never needs 
 - **A new seed:** first mount, changing where you train, or pressing "Another". These are the moments that mean "give me a different session."
 - **The same seed, reused:** ticking a strength row or moving the soft/normal/hard chip. `roll(false, false)` calls `generate()` again with the unchanged `seedRef.current`.
 
-That works because of what does and does not feed into the random draws. Format, slot pattern, and which movements get picked all come from `Math.random()` calls that know nothing about `arriving` or `intensity`; only the final rep-scaling step reads them. So the same seed with a different strength load or a different chip reproduces the same format and the same movements, and only the numbers move. Verified over 30 seeds, comparing `intensity: 1.0` against `intensity: 1.4`: format identical in 30/30, movement set identical in 30/30, reps changed in 22/30 (the other 8 are the EMOM clamp already on record elsewhere in this document, not a new issue).
+That works because of what does and does not feed into the random draws. Format, slot pattern, and which movements get picked all come from `Math.random()` calls that know nothing about `arriving` or `intensity`; only the final rep-scaling step reads them. So the same seed with a different strength load or a different chip reproduces the same format and the same movements, and only the numbers move. Rechecked after the EMOM pass fix over 30 seeds, comparing `intensity: 1.0` against `intensity: 1.4`: format identical in 30/30, movement set identical in 30/30, reps changed in 29/30.
 
 **The one place this can still move the shape.** `generate()` tries up to 300 candidates and returns the first with zero hard faults. Faults depend on `arriving.pre`, so a candidate that passed before could fail now, or the reverse, which changes how many candidates the loop consumes before it stops and therefore how far into the seeded stream the accepted one sits. In the measured data this is not a real risk: the smoke sweep found 0 of 8400 workouts carrying a hard fault, so the loop accepts the very first candidate essentially always. Recorded here rather than hidden, since "reproduces" should come with its actual guarantee, not an unqualified one.
 
@@ -344,8 +346,41 @@ The strength block already fed into `wod.strength` (`pre`, `dampen`, the axis pr
 
 `roll()` and `swapOne()` now snapshot `liftRows` and `oneRM` onto the generated candidate (`c.strengthRows`, `c.oneRM`), the same ad hoc pattern this file already used for `c.cue`. The card reads them in a block above the format headline, since chronologically the strength work happened first and it is why the axis bars carry their pre-load markers. `asText()` prepends the same lines, so Copy, Share, and the calendar export all agree with what the card shows.
 
-## The accessory default, and what it is and is not based on
+## The accessory default, now backed by the source log
 
-Checked before writing anything: the 55 sample sessions this app was built from are not in the repository, only what got distilled out of them into `MOVES`, `FORMATS`, and the seven `STRENGTH` presets. And even those presets carry zero accessory rows. `PRESET_ROWS` is main lifts only, for every one of the seven. So there is no session-frequency signal anywhere in this codebase to pre-select accessory work from, not even in aggregate.
+The original dump was supplied after the first implementation and is preserved verbatim in `data/55_sessions.txt`. The filename and product history say 55 sessions, but the file contains 56 timestamped entries. `scripts/analyze-corpus.js` makes that mismatch and every derived count reproducible.
 
-Rather than invent one, the starter default (walking lunges, DB row, both 3x8) is the two movements reported as actual accessory work earlier in this conversation. It is the fallback `loadPref("liftRows", ...)` returns when nothing has been saved yet, so it only ever applies to a first-time visitor and is never applied over a saved choice. Verified: a fresh browser context shows the two rows ticked; a context with its own saved `liftRows` keeps exactly that.
+Only the text before each conditioning marker is counted for accessory defaults. Split-squat, Bulgarian-squat, and walking-lunge work appears in 10 entries; dumbbell rows appear in 6. They are the two most common movements supported by the accessory grid. Their modal written doses are 3x8 and 3x10, so those are now the first-visit defaults. A saved `liftRows` preference still wins and is never overwritten.
+
+---
+
+# Week planner
+
+## One generator, two time horizons
+
+The planner does not own a second workout generator. `planWeek()` calls the same seeded `generate()` function for each day. It adds only the information a sequence needs: a schedule, earlier load carried into the next day, diversity exclusions, and an automatic effort choice.
+
+The source log gives one unusually strong scheduling signal: 23 entries are on Monday and 24 on Wednesday, 47 of 56 in total. That makes a two-day Monday/Wednesday week the honest default. The corresponding broad strength defaults are lower body and pressing, the most common before-conditioning focuses on those days. Three-to-five-day schedules remain available and spread the existing strength shortcuts across weekdays; those extended schedules are product defaults, not corpus frequency claims.
+
+## Carried fatigue is not today's work
+
+A daily session used to have one object called `strength`, which served two jobs because they were identical: it told `faults()` what load the athlete arrived carrying, and it told `sessionLoad()` what work happened today.
+
+They separate in a week. Wednesday's composition must see decayed Monday fatigue plus Wednesday strength, but Wednesday's reported load must not count Monday again. Candidates now keep both:
+
+- `arriving`: today's strength plus earlier fatigue, used by rep scaling and fault checks.
+- `strength`: only today's strength, used by `sessionLoad()` and the card.
+
+`sessionAxisLoad()` turns today's strength and conditioning into a six-axis vector. The next planned day decays the accumulated vector by `0.55 ^ calendarDays`, combines it with that day's strength, and runs the shared `arrivingFromAxis()` conversion. At the normal two-day gap, about 30% remains.
+
+The 0.55 coefficient is deliberately labelled a heuristic. The source log records sessions, not recovery or readiness, so it cannot validate a physiological decay curve.
+
+## Automatic effort and weekly diversity
+
+For `auto`, the planner generates the same seeded shape at soft, normal, and hard, then keeps the result closest to 310 total points. That target sits on the load scale already calibrated around 20 points per hard minute; it is not a new unit. A heavy strength day therefore tends to receive softer conditioning, while a light interval or quality day can move harder.
+
+Adjacent days exclude the previous format and movements. These are preferences, not hard constraints: `poolFor()` falls back to a repeated movement when a small environment cannot fill a required slot otherwise. The planner never returns an incomplete day just to satisfy variety.
+
+One week seed derives one stable seed per day. Editing strength or effort therefore preserves the existing formats and movements and updates reps and downstream carry. Changing environment can replace movements because availability changed. "Another week" is the explicit redraw.
+
+`npm run check:planner` verifies deterministic 2, 3, 4, and 5-day plans, adjacent diversity in the gym pool, nonzero carry-over, load accounting, and a changed result from a changed week seed.

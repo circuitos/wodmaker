@@ -126,9 +126,21 @@ const DAMP_PER_POINT = 0.000659;
 const DAMP_PER_LEG_POINT = 0.000608;
 const LEG_AXES = ["piernas", "posterior"];
 
+/* Turn any axis vector into the `arriving` shape the generator consumes.
+   Strength rows use this below, and the week planner uses the same function
+   for fatigue carried from earlier sessions. Keeping the conversion here
+   means both sources agree on how total and leg-heavy work suppress what
+   follows. */
+export function arrivingFromAxis(pre = {}) {
+  const points = Object.values(pre).reduce((sum, value) => sum + value, 0);
+  const legPoints = LEG_AXES.reduce((sum, axis) => sum + (pre[axis] || 0), 0);
+  const legShare = points > 0 ? legPoints / points : 0;
+  const drop = points * (DAMP_PER_POINT + DAMP_PER_LEG_POINT * legShare);
+  return { pre, dampen: Math.max(0.55, 1 - drop), points };
+}
+
 export function arrivingFromLifts(rows) {
   const pre = {};
-  let points = 0, legPoints = 0;
 
   for (const row of rows) {
     // A row is either a main lift, priced against a one-rep max, or accessory
@@ -136,16 +148,11 @@ export function arrivingFromLifts(rows) {
     const source = row.moveId ? moveById(row.moveId) : liftById(row.liftId);
     const p = row.moveId ? accessoryPoints(row) : liftPoints(row);
     if (!source || p <= 0) continue;
-    points += p;
     for (const [axis, share] of Object.entries(source.load)) {
       pre[axis] = (pre[axis] || 0) + p * share;
-      if (LEG_AXES.includes(axis)) legPoints += p * share;
     }
   }
-
-  const legShare = points > 0 ? legPoints / points : 0;
-  const drop = points * (DAMP_PER_POINT + DAMP_PER_LEG_POINT * legShare);
-  return { pre, dampen: Math.max(0.55, 1 - drop), points };
+  return arrivingFromAxis(pre);
 }
 
 /* The seven old presets, kept as one-tap shortcuts. Each is now just a set of

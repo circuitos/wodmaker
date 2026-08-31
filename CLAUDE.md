@@ -14,14 +14,19 @@ One owner per fact: link, don't restate.
 | The movement database (`MOVES`), the six axes | `src/moves.js` |
 | Workout formats, the soft/normal/hard steps, coaching cues | `src/formats.js` |
 | The strength lifts, and turning a session into an arriving load | `src/lifts.js` |
+| Original session log and its provenance | `data/55_sessions.txt`, `data/README.md` |
+| Facts derived from the source log | `src/corpus.js`, checked by `scripts/analyze-corpus.js` |
+| Week schedules, carry-over, automatic effort | `src/planner.js` |
 | Every string the interface renders (`T`) | `src/i18n.js` |
 | Candidate building, fault scoring, quantisation | `src/generator.js` |
 | Rep lines and the plain-text export | `src/text.js` |
 | Barbell plate maths | `src/plates.js` |
 | Preferences that survive a reload | `src/prefs.js` |
-| Styles (`CSS`), form wiring, calendar export | `src/App.jsx` |
+| Shared styles, daily form wiring, calendar export | `src/App.jsx` |
+| Week-planner interface and week copy | `src/WeekPlanner.jsx` |
 | Pages site composition (root + branch previews) | `scripts/build-preview-site.mjs` |
 | Generator regression sweep | `scripts/smoke.js`, output in `out/smoke-report.md` |
+| Deterministic week checks | `scripts/check-planner.js` |
 
 The model is plain JavaScript with no React in it, so `node --input-type=module -e 'import { generate } from "./src/generator.js"; ...'` works and `scripts/smoke.js` can import it. Keep it that way: nothing under `moves.js`, `formats.js`, `generator.js`, `text.js` or `plates.js` should import React.
 
@@ -53,6 +58,8 @@ npm run dev                     # local dev server on :5173
 npm run build                   # production build into dist/
 npm run preview                 # serve the built dist/ locally
 npm run lint                    # oxlint
+npm run corpus                  # report facts parsed from data/55_sessions.txt
+npm run check:planner           # deterministic 2-5 day planner checks
 npm run smoke                   # regression sweep -> out/smoke-report.md
 npm run smoke:quick             # same, 100 samples per cell, for the edit loop
 
@@ -73,9 +80,14 @@ node scripts/build-preview-site.mjs /tmp/site   # read-only: compose the full Pa
 - **`load` shares are what the fault checker reads.** Every `MOVES` entry carries a `load` map over the six axes that should sum to about 1. If it sums to something else, that movement quietly gets more or less weight than intended in `faults()`, and no error is raised. Check the axis bars in the UI after adding a movement.
 - **`cost` is calibrated, not arbitrary.** One hard minute of work is about 20 units. A new movement priced by feel rather than against that scale will distort every volume band it lands in.
 - **`load` and `passes` on a `FORMATS` entry are one fact, not two knobs.** `load` is the whole conditioning piece in points; `passes` is how many times you go through the movement list. The generator divides them to get a round target and `sessionLoad()` multiplies back. Changing `load` moves what gets built and what the interface reports, together. Run `npm run smoke` and diff the report.
+- **EMOM passes are cycles, not minutes.** Two items in ten minutes pass five times each. Four items in twelve minutes pass three times each. Three work items also pass three times in twelve minutes because the card renders minute four as rest. Counting `cap` passes makes every item happen every minute and inflates a normal EMOM to more than 600 points.
 - **`generate()` reproduces a session when given a `seed`, and does not otherwise.** Without one it reads `Math.random()` same as always, which `scripts/smoke.js` relies on. With one it installs a seeded stream for that single call and restores `Math.random` after, so a seeded call never affects an unseeded one. The same seed and the same `env`/`arriving`/`intensity` give back the same format and the same movements, because neither is chosen from anything that depends on `arriving` or `intensity`, only the rep scaling is. The guarantee is not absolute: a candidate that clears `faults()` under one `arriving` and not another consumes a different amount of the random stream first. In the current data (0 of 8400 swept workouts carry a hard fault) this essentially never bites, but it is not proven to never happen.
 - **`INTENSITY` multipliers are chosen for what they deliver, not how they read.** Asking for 0.8 does not give 80% of the work: `quantise` floors each movement at half its minimum dose and `buildCandidate` clamps the rep scaling at 0.55, so roughly 60% of the request survives. 0.6 lands at about -16%, 1.4 at about +24%. Work can be added by scaling reps but not removed the same way, so -16% is near the softest this mechanism reaches at all. Re-measure with `npm run smoke` if these move.
 - **`generate()` takes options, not more positional arguments.** `generate(env, arriving, { locked, fixed, intensity })`. It was heading for five positional parameters, three of them optional, which is how call sites start passing `null, null, 1`.
+- **`arriving` and `strength` are the same only in the daily view.** A planned day arrives with today's strength plus fatigue carried from earlier sessions. `faults()` and volume scaling read the combined `arriving`; `sessionLoad()` counts only today's `strength` and conditioning. Folding carry-over into `strength` would count yesterday's work again in every later day.
+- **Planner carry-over is an explicit heuristic.** `DAILY_CARRY = 0.55` leaves about 30% after the source log's usual Monday-to-Wednesday gap. The source dump contains dates and sessions, not recovery measurements. Keep the coefficient named, documented, and covered by `npm run check:planner`; do not describe it as corpus-derived physiology.
+- **The planner owns one seed, not one random redraw per control.** `daySeed()` derives stable day seeds from it. Changing strength or effort should preserve formats and movements just like the daily view; changing environment may necessarily replace unavailable movements. "Another week" is the action that changes the week seed.
+- **The source says 55 and contains 56.** Preserve `data/55_sessions.txt` verbatim. Product defaults may use parsed facts from all 56 timestamped entries, but code and docs must keep the mismatch visible rather than silently choosing one count.
 - **A `LIFTS` entry is priced twice, and both matter.** `load` is the axis split, same shape and rule as `MOVES`. `toll` is effort per rep against the baseline of 1.0, and it is what stops a rep count from standing in for how much a lift takes out of you: a deadlift is `2.0` because 15 heavy pulls cost about what 30 reps of anything else would. Get `toll` wrong and the conditioning that follows is wrong by the same factor.
 - **A strength-block row is one of two kinds, and they are priced differently.** A `LIFTS` row is heavy barbell work against a one-rep max: `sets * reps * 5 * (pct / 0.75) * toll`. An `ACCESSORY` row names a `MOVES` id and is charged per rep by that movement's own `cost`, exactly as it would be inside a workout. Do not run accessory work through the percentage formula: with no 1RM to divide by it falls back to 75%, and a 3x8-per-side split squat comes out at 240 points, more than a 5x4 squat and a 5x4 bench together.
 - **Warm-up ramps are not logged, on purpose.** The linear percentage term is not trustworthy below about 60%, which is where every warm-up set lives, and the calibration already contains them: the old presets priced whole sessions, ramp included. Logging them would count them twice.

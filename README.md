@@ -4,7 +4,7 @@ A CrossFit-style workout generator that builds a conditioning piece around the s
 
 Bilingual: Spanish and English, toggled in the header.
 
-Built from about 55 normalised sample sessions, so the doses and formats look like workouts a coach would write rather than a random draw from a movement list.
+Built from the original training log, so the doses and formats look like workouts a coach would write rather than a random draw from a movement list. The source file is preserved under `data/`; it is named for 55 sessions but contains 56 timestamped entries.
 
 ## Quick start
 
@@ -27,6 +27,8 @@ The live site is auto-deployed from the default branch. Every other branch gets 
 6. The candidate is scored against a fault list: no axis over its share of the total work, a tighter cap on whatever the strength block already hammered, a ceiling on stacked skill and joint impact, plus soft warnings for grip-heavy and pull-free sessions. The generator draws up to 300 candidates and returns the first clean one, or the least-faulty one it saw.
 7. The result renders with per-movement rep lines, a load breakdown across the six axes, a coaching cue, barbell plate loading for gym sessions, and any warnings that survived.
 
+The **Week** view uses the same generator rather than a second workout model. It plans 2–5 sessions, carries each day's six-axis load into the next training day with calendar-day decay, avoids repeating the previous format and movements, and keeps one seed per week so edits change volume without reshuffling everything. Its default Monday/Wednesday cadence comes from the source log. Each day can choose a strength focus, environment, and either an explicit effort or `auto`, which selects the soft/normal/hard result closest to the shared daily-load target.
+
 Anything you like, you can lock; anything you don't, you can swap for another movement in the same slot category without rerolling the whole workout.
 
 ## Exports
@@ -34,6 +36,7 @@ Anything you like, you can lock; anything you don't, you can swap for another mo
 - **Copy** puts a plain-text version on the clipboard for a training log.
 - **Share** uses the native share sheet where the browser has one, and falls back to copy.
 - **Calendar** downloads an `.ics` file or opens a prefilled Google Calendar event at the date and time you pick.
+- **Copy week** copies every planned day as one plain-text block.
 
 ## The six axes
 
@@ -53,6 +56,9 @@ wodmaker/
 │   ├── text.js                 # rep lines and plain-text export
 │   ├── plates.js               # barbell plate maths
 │   ├── prefs.js                # the few choices that survive a reload
+│   ├── corpus.js               # reproducible defaults derived from the source log
+│   ├── planner.js              # week generation, carry-over, automatic effort
+│   ├── WeekPlanner.jsx         # the week-planner interface
 │   ├── App.jsx                 # the interface
 │   ├── main.jsx                # React root
 │   └── index.css               # global reset (app styles live in App.jsx)
@@ -60,8 +66,13 @@ wodmaker/
 │   ├── favicon.svg
 │   └── robots.txt              # keeps /previews/ out of search engines
 ├── scripts/
+│   ├── analyze-corpus.js       # reports source-log frequencies (npm run corpus)
+│   ├── check-planner.js        # deterministic planner checks
 │   ├── smoke.js                # generator regression sweep (npm run smoke)
 │   └── build-preview-site.mjs  # composes the Pages site (run by CI)
+├── data/
+│   ├── 55_sessions.txt         # original source dump, kept verbatim
+│   └── README.md               # provenance and derived defaults
 ├── out/
 │   └── smoke-report.md         # latest sweep (regenerated, never hand-edited)
 ├── .github/
@@ -80,7 +91,7 @@ wodmaker/
 └── README.md
 ```
 
-The model (`moves.js` through `plates.js`) is plain JavaScript with no React in it, so it runs under Node as well as in the browser. `App.jsx` is the interface and the only file that imports React.
+The model (`moves.js` through `planner.js`) is plain JavaScript with no React in it, so it runs under Node as well as in the browser. React stays in `App.jsx` and `WeekPlanner.jsx`.
 
 ## Contributing
 
@@ -96,6 +107,8 @@ The movement table is the actual content. To add a movement, add an entry to `MO
 Two things to get right: `load` shares should sum to about 1, and `cost` is calibrated so a hard minute of work is roughly 20 units. Both are read silently by the fault checker, so a wrong value shows up as skewed workouts rather than an error.
 
 Run `npm run smoke` before and after any change to the generator or the data, and read the diff in `out/smoke-report.md`. The output is random, so a workout that looks plausible proves nothing; the distributions do.
+
+Run `npm run check:planner` after planner changes and `npm run corpus` after changing the source-log parser or any corpus-derived default.
 
 See `CLAUDE.md` for the field reference and the known gotchas. Anything larger than a data edit, meaning a new control, mode, or screen, starts with the check in its Adding Features section: work out where the idea belongs and what it replaces before writing code.
 

@@ -7,6 +7,8 @@ import { generate, pick, sessionLoad } from "./generator.js";
 import { asText, headline, strengthLine } from "./text.js";
 import { platesFor } from "./plates.js";
 import { loadPref, savePref } from "./prefs.js";
+import { CORPUS_DEFAULTS } from "./corpus.js";
+import WeekPlanner from "./WeekPlanner.jsx";
 
 /* ------------------------------------------------------------------ *
  *  WOD GENERATOR
@@ -72,6 +74,10 @@ const CSS = `
 .lang button{border:0;background:transparent;padding:5px 9px;font-size:11px;font-weight:600;
   letter-spacing:.08em;cursor:pointer;color:var(--ink)}
 .lang button[aria-pressed="true"]{background:var(--ink);color:var(--board)}
+.viewtabs{display:flex;gap:4px;margin:-8px 0 20px;border-bottom:1px solid var(--rule)}
+.viewtabs button{border:0;border-bottom:3px solid transparent;background:transparent;padding:10px 14px 8px;
+  color:var(--ink-2);font:inherit;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+.viewtabs button[aria-pressed="true"]{border-bottom-color:var(--red);color:var(--ink)}
 .grid{display:grid;grid-template-columns:1fr;gap:22px}
 @media(min-width:880px){.grid{grid-template-columns:288px 1fr;gap:32px;align-items:start}}
 .lbl{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);
@@ -172,6 +178,36 @@ const CSS = `
 a.btn{text-decoration:none}
 button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
   outline:2px solid var(--blue);outline-offset:2px}
+.week{display:grid;gap:18px}
+.week-intro,.week-controls{display:flex;align-items:flex-end;justify-content:space-between;gap:18px}
+.week-note{max-width:620px;margin:3px 0 0;color:var(--ink-2);font-size:13px;line-height:1.45}
+.week-actions{display:flex;gap:8px;flex:0 0 auto}.week-actions .pri{flex:auto}
+.week-controls{padding:14px 16px;border:1px solid var(--rule);background:#FAFAF7}
+.week-count{min-width:210px}.week-total{display:flex;align-items:baseline;gap:8px;color:var(--ink-2);font-size:12px}
+.week-total .lbl{margin:0}.week-total strong{font-size:30px;color:var(--ink)}
+.week-balance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}
+.week-axis{display:grid;grid-template-columns:110px 1fr 34px;align-items:center;gap:8px;font-size:10.5px;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+.week-days{display:grid;grid-template-columns:1fr;gap:18px;align-items:start}
+@media(min-width:760px){.week-days{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.day-card{background:#fff;border:1.5px solid var(--ink);box-shadow:3px 3px 0 rgba(20,23,26,.08)}
+.day-head{display:flex;align-items:flex-end;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--rule)}
+.day-head h2{font-size:27px;margin:2px 0 0}.day-kicker{font-size:9px;letter-spacing:.12em;color:var(--ink-2);text-transform:uppercase}
+.day-load{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700}.day-load::after{content:' pts';font-size:10px;color:var(--ink-2)}
+.day-config{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;padding:10px 12px;background:#FAFAF7;border-bottom:1px solid var(--rule)}
+.day-config label>span{display:block;margin-bottom:3px;font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)}
+.day-config select{width:100%;min-width:0;padding:6px 5px;border:1px solid var(--rule);background:#fff;color:var(--ink);font:inherit;font-size:11px}
+.day-strength{padding:7px 14px;border-bottom:1px dashed var(--rule)}.day-strength .grp{margin:0 0 3px}
+.day-strength ul{list-style:none;padding:0;margin:0;color:var(--ink-2);font-size:11.5px}.day-strength li::before{content:'· '}
+.day-wod-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 14px 7px}
+.day-wod-head h3{font-size:23px;margin:0}.day-wod-head span{font-size:9.5px;text-transform:uppercase;color:var(--ink-2)}
+.day-wod ol{list-style:none;padding:0 14px;margin:0}.day-wod li{display:grid;grid-template-columns:auto auto 1fr;gap:8px;
+  align-items:baseline;padding:6px 0;border-top:1px solid #EFEEE9;font-size:12.5px}.day-wod li>span:first-child{font-size:9px;color:var(--ink-2)}
+.day-wod .cue{padding:8px 14px 12px;margin:0;font-size:11.5px}
+.day-foot{display:flex;gap:10px;flex-wrap:wrap;padding:8px 14px;background:#FAFAF7;border-top:1px solid var(--rule);
+  color:var(--ink-2);font-size:10.5px}.day-foot b{color:var(--ink)}
+@media(max-width:620px){.week-intro,.week-controls{align-items:stretch;flex-direction:column}.week-actions{width:100%}
+  .week-actions .btn{flex:1;justify-content:center}.week-balance{grid-template-columns:1fr}.day-config{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:no-preference){
   .card{transition:box-shadow .2s ease}
 }
@@ -192,23 +228,17 @@ const IconSwap = () => (
 
 export default function App() {
   const [lang, setLang] = useState(() => loadPref("lang", "es"));
+  const [view, setView] = useState(() => loadPref("view", "today"));
   const [meterOpen, setMeterOpen] = useState(() => loadPref("meterOpen", true));
   const [intensity, setIntensity] = useState(() => loadPref("intensity", "normal"));
   const [env, setEnv] = useState("gym");
   /* What you lifted before this: one row per ticked lift. `kg` is what you put
      on the bar; `pct` only carries a preset's intent when no 1RM is on file to
      turn it into kilos. */
-  /* No real default exists to seed this from: the 55 sample sessions this app
-     was built from are not in the repo, only what got distilled out of them
-     (MOVES doses, FORMATS weights, the STRENGTH presets), and even those
-     presets carry zero accessory rows. So this starter pair is not derived
-     from that corpus; it is what was reported as the actual accessory work
-     in this conversation, used only when nothing has been saved yet. Anyone
-     who ticks their own rows keeps them from then on. */
-  const DEFAULT_ACCESSORY = [
-    { moveId: "walking_lunge", sets: 3, reps: 8, kg: 0 },
-    { moveId: "db_row", sets: 3, reps: 8, kg: 0 },
-  ];
+  /* The source dump is now checked in. Its before-conditioning blocks most
+     often contain split-squat/lunge work, then dumbbell rows. The doses below
+     are the corpus modes, and still apply only when no preference was saved. */
+  const DEFAULT_ACCESSORY = CORPUS_DEFAULTS.accessory.map(({ moveId, sets, reps, kg }) => ({ moveId, sets, reps, kg }));
   const [liftRows, setLiftRows] = useState(() => loadPref("liftRows", DEFAULT_ACCESSORY));
   /* One-rep maxes are a fact about you, not about today, so they outlive the
      session and the reload. */
@@ -231,6 +261,7 @@ export default function App() {
   const isFirstArriving = useRef(true);
 
   useEffect(() => { savePref("lang", lang); }, [lang]);
+  useEffect(() => { savePref("view", view); }, [view]);
   useEffect(() => { savePref("meterOpen", meterOpen); }, [meterOpen]);
   useEffect(() => { savePref("liftRows", liftRows); }, [liftRows]);
   useEffect(() => { savePref("oneRM", oneRM); }, [oneRM]);
@@ -368,6 +399,14 @@ export default function App() {
           </div>
         </header>
 
+        <nav className="viewtabs" aria-label={t.planner.title}>
+          <button aria-pressed={view === "today"} onClick={() => setView("today")}>{t.planner.today}</button>
+          <button aria-pressed={view === "week"} onClick={() => setView("week")}>{t.planner.week}</button>
+        </nav>
+
+        {view === "week" ? (
+          <WeekPlanner lang={lang} oneRM={oneRM} customRows={liftRows} />
+        ) : (
         <div className="grid">
           <aside>
             <div className="block">
@@ -522,7 +561,7 @@ export default function App() {
                 ))}
                 {wod.fmt.id === "emom" && wod.items.length === 3 && (
                   <div className="row"><span className="minute mono disp">Min 4</span>
-                    <span className="reps mono">—</span><span className="nm">{t.rest}</span></div>
+                    <span className="reps mono">·</span><span className="nm">{t.rest}</span></div>
                 )}
               </div>
 
@@ -541,7 +580,7 @@ export default function App() {
                 <p className="lbl" style={{ marginTop: 14 }}>{t.axes}</p>
                 {AXES.map((a) => {
                   const s = shares[a] || 0;
-                  const pre = wod.strength.pre[a] || 0;
+                  const pre = (wod.arriving || wod.strength).pre[a] || 0;
                   const hot = s > 0.4 || (pre >= 80 && s > 0.24);
                   return (
                     <div className="axis" key={a}>
@@ -586,6 +625,7 @@ export default function App() {
             </main>
           )}
         </div>
+        )}
       </div>
     </div>
   );
