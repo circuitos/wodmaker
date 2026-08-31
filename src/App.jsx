@@ -68,10 +68,14 @@ const CSS = `
   text-transform:uppercase;letter-spacing:.02em;line-height:.95}
 .mono{font-family:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   font-variant-numeric:tabular-nums}
-.h1{font-size:42px;font-weight:700;margin:0}
-.sub{font-size:12px;color:var(--ink-2);letter-spacing:.14em;text-transform:uppercase;margin-top:2px}
+/* The title sets the page's minimum width, so it has to scale rather than
+   push the language toggle off the right edge on a phone. */
+.h1{font-size:clamp(26px,8.5vw,42px);font-weight:700;margin:0}
+.sub{font-size:clamp(10px,2.8vw,12px);color:var(--ink-2);letter-spacing:.14em;
+  text-transform:uppercase;margin-top:2px}
 .top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
   border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:20px}
+.top>div:first-child{min-width:0}
 .lang{display:flex;border:1px solid var(--ink);border-radius:2px;overflow:hidden;flex:0 0 auto}
 .lang button{border:0;background:transparent;padding:5px 9px;font-size:11px;font-weight:600;
   letter-spacing:.08em;cursor:pointer;color:var(--ink)}
@@ -80,8 +84,8 @@ const CSS = `
 .viewtabs button{border:0;border-bottom:3px solid transparent;background:transparent;padding:10px 14px 8px;
   color:var(--ink-2);font:inherit;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
 .viewtabs button[aria-pressed="true"]{border-bottom-color:var(--red);color:var(--ink)}
-.grid{display:grid;grid-template-columns:1fr;gap:22px}
-@media(min-width:880px){.grid{grid-template-columns:288px 1fr;gap:32px;align-items:start}}
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:22px}
+@media(min-width:880px){.grid{grid-template-columns:288px minmax(0,1fr);gap:32px;align-items:start}}
 .lbl{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);
   margin:0 0 8px;font-weight:600}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
@@ -126,9 +130,12 @@ const CSS = `
 .block{margin-bottom:22px}
 .card{background:#fff;border:2px solid var(--ink);border-radius:3px;
   box-shadow:5px 5px 0 rgba(20,23,26,.1)}
+/* The headline and the work tag sit side by side until they cannot: the tag
+   is nowrap, so on a narrow phone it has to be allowed onto its own line
+   rather than widening the whole card. */
 .card-h{padding:16px 18px 12px;border-bottom:1px dashed var(--rule);
-  display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.fmt{font-size:32px;font-weight:700}
+  display:flex;align-items:baseline;justify-content:space-between;gap:4px 10px;flex-wrap:wrap}
+.fmt{font-size:clamp(24px,7vw,32px);font-weight:700;min-width:0;overflow-wrap:anywhere}
 .tag{font-size:10.5px;letter-spacing:.14em;color:var(--ink-2);text-transform:uppercase;white-space:nowrap}
 .rows{padding:6px 8px 10px}
 .row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:2px}
@@ -137,8 +144,11 @@ const CSS = `
 .minute{font-size:10px;letter-spacing:.1em;color:var(--ink-2);width:40px;flex:0 0 40px}
 .reps{font-size:19px;font-weight:600;min-width:52px;flex:0 0 auto}
 /* A ladder prints every rung, so the dose can be much longer than a rep count. */
-.reps.long{font-size:13px;letter-spacing:-.01em;min-width:0}
-.nm{font-size:15px;line-height:1.25;flex:1 1 auto}
+/* A ladder prints every rung, so the dose can be much longer than a rep
+   count. It is the number you train off, so it keeps one line and the
+   movement name takes the wrap instead. */
+.reps.long{font-size:12px;letter-spacing:-.02em;white-space:nowrap}
+.nm{font-size:15px;line-height:1.25;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .nm em{font-style:normal;color:var(--ink-2);font-size:12.5px}
 .ico{border:0;background:transparent;cursor:pointer;padding:6px;border-radius:2px;
   color:var(--ink-2);opacity:.55;line-height:0}
@@ -201,7 +211,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
 .week-balance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}
 .week-axis{display:grid;grid-template-columns:110px 1fr 34px;align-items:center;gap:8px;font-size:10.5px;
   text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
-.week-days{display:grid;grid-template-columns:1fr;gap:18px;align-items:start}
+.week-days{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}
 @media(min-width:760px){.week-days{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .day-card{background:#fff;border:1.5px solid var(--ink);box-shadow:3px 3px 0 rgba(20,23,26,.08)}
 .day-head{display:flex;align-items:flex-end;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--rule)}

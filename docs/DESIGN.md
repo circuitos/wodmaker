@@ -459,3 +459,17 @@ The model itself was already coherent. `passes: () => 3` is exact because the sc
 `npm run check:planner` pins the invariant that made this findable: printed rungs sum to `reps * passes`, within the rounding of five integers.
 
 Rounding does leave a tie at small doses (`4-3-2-2-1`). That is honest about a ladder the generator scaled down to almost nothing, where the old display claimed 30 reps and charged for 12, so it is left alone rather than smoothed into a nicer-looking lie.
+
+## The page scrolled sideways on a phone
+
+Found while checking the ladder rungs at 390px, and it turned out to predate them. Three separate causes, each of which widened the document and dragged everything else out with it.
+
+**The title set the page's minimum width.** `.h1` was a fixed 42px, which renders "GENERADOR DE WOD" at 302px. With the language toggle at 71px and the flex gap, the header needed 417px before anything else was considered, so every viewport under about 430px scrolled. The title now scales with `clamp(26px,8.5vw,42px)` and its flex parent may shrink.
+
+**A `1fr` grid track is `minmax(auto,1fr)`.** It refuses to go below the min-content width of its widest item, so a card holding a long ladder dose widened the column, and the sidebar sharing that column stretched with it. The overflow therefore reported itself in the sidebar while the cause was in the card, which is what made it confusing to chase. `minmax(0,1fr)` lets the track shrink and the content wrap.
+
+**The card header could not wrap.** The headline and the nowrap work tag sat on one flex line, so "CHIPPER · CAP 10'" beside "TRABAJO TOTAL · 121" needed 354px at a 320px viewport. It wraps now, and the headline scales.
+
+Measured across 320, 360, 390, 430, 620, 768, 880 and 1280px: 25 workouts in the Day view and every week size from 2 to 5, zero horizontal overflow. Before the fix, 320px overflowed on 6 of 25 workouts and 390px on every one of them.
+
+One layout decision follows from what a ladder is for. When a rung list and a movement name compete for a narrow row, the rungs keep their line and the name wraps: the rungs are the number you train off, and breaking `20-16-12-8-4` across two lines to keep "m de carrera" intact gets the priority backwards.
