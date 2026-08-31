@@ -1,7 +1,64 @@
+/* The palette, and the only place a colour is written down.
+ *
+ * Everything else in the app reaches for these through var(). The tokens live
+ * here rather than in the CSS template string in App.jsx because Vite emits
+ * this file as a <link> in <head>: the ground colour is painted before the
+ * bundle runs, so the pre-paint boot script in index.html has something to
+ * stamp data-theme onto. Tokens in the bundle would arrive one frame late and
+ * flash white on the way in.
+ *
+ * The ramp, lightest to darkest in the light theme:
+ *   --surface  cards, inputs, selects: the paper you write on
+ *   --panel    inset strips (action bar, day config, footers, row hover)
+ *   --hover    the wash a button or icon takes under the pointer
+ *   --hair     the line between two rows of the same list
+ *   --track    the empty part of a meter bar
+ *   --board    the page itself
+ *   --rule     borders that separate, --frame borders that enclose
+ *
+ * --ink and --frame are the same colour in the light theme and deliberately
+ * are not in the dark one: a 2px near-white box around every card reads as a
+ * mistake, while near-black around every card is the whole newsprint look.
+ */
+:root {
+  color-scheme: light;
+  --board: #F4F3EE;
+  --surface: #FFFFFF;
+  --panel: #FAFAF7;
+  --hover: #F1F0EB;
+  --hair: #EFEEE9;
+  --track: #EDECE6;
+  --rule: #CFD2CB;
+  --frame: #14171A;
+
+  --ink: #14171A;
+  --ink-2: #5C6169;
+  --ink-max: #000000;
+
+  --shadow: rgba(20, 23, 26, .1);
+  --shadow-soft: rgba(20, 23, 26, .08);
+
+  --red: #C8102E;
+  --blue: #0057B8;
+  --yellow: #F5C400;
+  --green: #00843D;
+
+  /* The plate meter: four coloured bumpers, one bare change plate, and the
+     steel they hang on. The bumpers reuse the four accents above, so the
+     plates and the axis bars stay one system rather than two palettes. */
+  --plate-bare: #E8E6DF;
+  --plate-edge: #14171A;
+  --steel: #8A8F98;
+  --steel-dark: #5C6169;
+  --steel-collar: #3A3F47;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background: var(--board);
+  color: var(--ink);
 }

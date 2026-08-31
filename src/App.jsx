@@ -36,19 +36,19 @@ function Barbell({ work }) {
   const sleeve = 96;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} aria-hidden="true">
-      <rect x="8" y={mid - 4} width={W - 16} height="8" rx="4" fill="#8A8F98" />
-      <rect x={W / 2 - 52} y={mid - 6} width="104" height="12" rx="6" fill="#5C6169" />
+      <rect x="8" y={mid - 4} width={W - 16} height="8" rx="4" fill="var(--steel)" />
+      <rect x={W / 2 - 52} y={mid - 6} width="104" height="12" rx="6" fill="var(--steel-dark)" />
       {[-1, 1].map((dir) =>
         plates.map((p, i) => {
           const x = W / 2 + dir * (52 + i * 12) - (dir === 1 ? 0 : 10);
           return (
             <rect key={`${dir}-${i}`} x={x} y={mid - p.h / 2} width="10" height={p.h} rx="2"
-              fill={p.c} stroke="#14171A" strokeWidth="1.2" />
+              fill={p.c} stroke="var(--plate-edge)" strokeWidth="1.2" />
           );
         })
       )}
       {[-1, 1].map((d) => (
-        <rect key={d} x={W / 2 + d * (52 + sleeve) - (d === 1 ? 0 : 6)} y={mid - 9} width="6" height="18" rx="2" fill="#3A3F47" />
+        <rect key={d} x={W / 2 + d * (52 + sleeve) - (d === 1 ? 0 : 6)} y={mid - 9} width="6" height="18" rx="2" fill="var(--steel-collar)" />
       ))}
     </svg>
   );
@@ -58,10 +58,9 @@ function Barbell({ work }) {
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
-:root{
-  --board:#F4F3EE; --ink:#14171A; --ink-2:#5C6169; --rule:#CFD2CB;
-  --red:#C8102E; --blue:#0057B8; --yellow:#F5C400; --green:#00843D;
-}
+/* Every colour below is a token from src/index.css. Do not write a hex here:
+   the tokens are what the dark theme redefines, and a literal is a spot the
+   theme cannot reach. */
 *{box-sizing:border-box}
 .wg{min-height:100vh;background:var(--board);color:var(--ink);
   font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;
@@ -77,9 +76,9 @@ const CSS = `
 .sub{font-size:clamp(10px,2.8vw,12px);color:var(--ink-2);letter-spacing:.14em;
   text-transform:uppercase;margin-top:2px}
 .top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
-  border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:20px}
+  border-bottom:2px solid var(--frame);padding-bottom:10px;margin-bottom:20px}
 .top>div:first-child{min-width:0}
-.lang{display:flex;border:1px solid var(--ink);border-radius:2px;overflow:hidden;flex:0 0 auto}
+.lang{display:flex;border:1px solid var(--frame);border-radius:2px;overflow:hidden;flex:0 0 auto}
 .lang button{border:0;background:transparent;padding:5px 9px;font-size:11px;font-weight:600;
   letter-spacing:.08em;cursor:pointer;color:var(--ink)}
 .lang button[aria-pressed="true"]{background:var(--ink);color:var(--board)}
@@ -92,12 +91,12 @@ const CSS = `
 .lbl{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);
   margin:0 0 8px;font-weight:600}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{border:1.5px solid var(--ink);background:transparent;border-radius:2px;padding:9px 12px;
+.chip{border:1.5px solid var(--frame);background:transparent;border-radius:2px;padding:9px 12px;
   cursor:pointer;text-align:left;flex:1 1 auto;min-width:88px;color:var(--ink);font:inherit}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--board)}
 .chip b{display:block;font-size:14px;font-weight:600}
 .chip span{display:block;font-size:10.5px;opacity:.7;margin-top:2px;line-height:1.25}
-.seg{display:flex;border:1.5px solid var(--ink);border-radius:2px;overflow:hidden}
+.seg{display:flex;border:1.5px solid var(--frame);border-radius:2px;overflow:hidden}
 .seg button{flex:1;border:0;background:transparent;padding:9px 6px;font:inherit;font-size:11px;
   font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;color:var(--ink)}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--board)}
@@ -106,17 +105,17 @@ const CSS = `
 .shortcuts{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
 .scut{border:1px solid var(--rule);background:transparent;border-radius:2px;padding:4px 7px;
   font:inherit;font-size:11px;color:var(--ink-2);cursor:pointer}
-.scut:hover{border-color:var(--ink);color:var(--ink)}
+.scut:hover{border-color:var(--frame);color:var(--ink)}
 .grp{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);
   margin:12px 0 3px;font-weight:600}
 .lifts{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
-.lift{border-bottom:1px solid #EFEEE9;padding:5px 0}
-.lift.on{background:#FAFAF7}
+.lift{border-bottom:1px solid var(--hair);padding:5px 0}
+.lift.on{background:var(--panel)}
 .lname{display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer}
 .lname input{margin:0;accent-color:var(--ink)}
 .lift.on .lname{font-weight:600}
 .lfields{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:5px 0 2px 22px;font-size:12px}
-.num{width:38px;padding:3px 4px;border:1px solid var(--rule);border-radius:2px;background:#fff;
+.num{width:38px;padding:3px 4px;border:1px solid var(--rule);border-radius:2px;background:var(--surface);
   font:inherit;font-size:12px;color:var(--ink);text-align:right}
 .num:focus{outline:2px solid var(--ink);outline-offset:1px}
 .num.kg{width:52px;margin-left:5px}
@@ -130,11 +129,11 @@ const CSS = `
 .pct{margin-left:auto;font-weight:500}
 .ltotal{display:flex;align-items:center;gap:8px;margin:10px 0 0;font-size:13px}
 .ltotal .mono{font-weight:600}
-.sel{width:100%;padding:10px;border:1.5px solid var(--ink);border-radius:2px;background:transparent;
+.sel{width:100%;padding:10px;border:1.5px solid var(--frame);border-radius:2px;background:transparent;
   font:inherit;font-size:14px;color:var(--ink)}
 .block{margin-bottom:22px}
-.card{background:#fff;border:2px solid var(--ink);border-radius:3px;
-  box-shadow:5px 5px 0 rgba(20,23,26,.1)}
+.card{background:var(--surface);border:2px solid var(--frame);border-radius:3px;
+  box-shadow:5px 5px 0 var(--shadow)}
 /* The headline and the work tag sit side by side until they cannot: the tag
    is nowrap, so on a narrow phone it has to be allowed onto its own line
    rather than widening the whole card. */
@@ -144,8 +143,8 @@ const CSS = `
 .tag{font-size:10.5px;letter-spacing:.14em;color:var(--ink-2);text-transform:uppercase;white-space:nowrap}
 .rows{padding:6px 8px 10px}
 .row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:2px}
-.row+.row{border-top:1px solid #EFEEE9}
-.row:hover{background:#FAFAF7}
+.row+.row{border-top:1px solid var(--hair)}
+.row:hover{background:var(--panel)}
 .minute{font-size:10px;letter-spacing:.1em;color:var(--ink-2);width:40px;flex:0 0 40px}
 .reps{font-size:19px;font-weight:600;min-width:52px;flex:0 0 auto}
 /* A ladder prints every rung, so the dose can be much longer than a rep count. */
@@ -157,15 +156,15 @@ const CSS = `
 .nm em{font-style:normal;color:var(--ink-2);font-size:12.5px}
 .ico{border:0;background:transparent;cursor:pointer;padding:6px;border-radius:2px;
   color:var(--ink-2);opacity:.55;line-height:0}
-.ico:hover{opacity:1;background:#F0EFEA}
+.ico:hover{opacity:1;background:var(--hover)}
 .ico[aria-pressed="true"]{opacity:1;color:var(--red)}
 .cue{padding:0 18px 16px;font-size:13px;color:var(--ink-2);font-style:italic}
-.prev{padding:14px 18px 12px;border-bottom:2px solid var(--ink);background:#FAFAF7}
+.prev{padding:14px 18px 12px;border-bottom:2px solid var(--frame);background:var(--panel)}
 .prevblock+.prevblock{margin-top:8px}
 .prevlist{list-style:none;margin:0;padding:0;font-size:13px;color:var(--ink-2)}
 .prevlist li{padding:2px 0}
 .prevlist li::before{content:"· ";color:var(--ink-2)}
-.meter{border-top:2px solid var(--ink);padding:16px 18px}
+.meter{border-top:2px solid var(--frame);padding:16px 18px}
 .mhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
 .work{font-size:26px;font-weight:700}
 .mtoggle{margin-right:auto;margin-left:10px;border:0;background:transparent;padding:2px 4px;
@@ -175,7 +174,7 @@ const CSS = `
 .mtoggle:focus-visible{outline:2px solid var(--ink);outline-offset:2px;opacity:1}
 .axis{display:grid;grid-template-columns:104px 1fr 34px;align-items:center;gap:10px;margin-top:7px}
 .axis .an{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
-.bar{height:7px;background:#EDECE6;border-radius:1px;overflow:hidden}
+.bar{height:7px;background:var(--track);border-radius:1px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--ink)}
 .bar i.hot{background:var(--red)}
 .pct{font-size:11px;color:var(--ink-2);text-align:right}
@@ -184,17 +183,17 @@ const CSS = `
 /* The actions sit at the top of the card: they are the most-used part of
    the app and should never be a scroll away. */
 .acts{display:flex;gap:8px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--rule);
-  background:#FAFAF7}
-.btn{border:1.5px solid var(--ink);background:transparent;border-radius:2px;padding:11px 15px;
+  background:var(--panel)}
+.btn{border:1.5px solid var(--frame);background:transparent;border-radius:2px;padding:11px 15px;
   font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink);
   display:inline-flex;align-items:center;gap:7px}
-.btn:hover{background:#F1F0EB}
+.btn:hover{background:var(--hover)}
 .btn.pri{background:var(--ink);color:var(--board);flex:1 1 140px;justify-content:center}
-.btn.pri:hover{background:#000}
+.btn.pri:hover{background:var(--ink-max)}
 .pop{margin:14px 18px;border:1.5px dashed var(--rule);border-radius:2px;padding:14px}
 .pop label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--ink-2);margin-bottom:5px}
-.pop input{width:100%;padding:9px;border:1.5px solid var(--ink);border-radius:2px;font:inherit;
+.pop input{width:100%;padding:9px;border:1.5px solid var(--frame);border-radius:2px;font:inherit;
   background:transparent;color:var(--ink)}
 .pop .two{display:flex;gap:10px;margin-bottom:12px}
 .pop .two>div{flex:1}
@@ -202,7 +201,7 @@ a.btn{text-decoration:none}
 button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
   outline:2px solid var(--blue);outline-offset:2px}
 .dayswitch{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:0 0 18px}
-.dayswitch button{border:1px solid var(--rule);background:#fff;color:var(--ink-2);padding:6px 13px;
+.dayswitch button{border:1px solid var(--rule);background:var(--surface);color:var(--ink-2);padding:6px 13px;
   font:inherit;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
 .dayswitch button[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--board)}
 .dayswitch-load{margin-left:auto;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
@@ -214,7 +213,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
 .week-intro,.week-controls{display:flex;align-items:flex-end;justify-content:space-between;gap:18px}
 .week-note{max-width:620px;margin:3px 0 0;color:var(--ink-2);font-size:13px;line-height:1.45}
 .week-actions{display:flex;gap:8px;flex:0 0 auto}.week-actions .pri{flex:auto}
-.week-controls{padding:14px 16px;border:1px solid var(--rule);background:#FAFAF7}
+.week-controls{padding:14px 16px;border:1px solid var(--rule);background:var(--panel)}
 .week-count{min-width:210px}.week-total{display:flex;align-items:baseline;gap:8px;color:var(--ink-2);font-size:12px}
 .week-total .lbl{margin:0}.week-total strong{font-size:30px;color:var(--ink)}
 .week-balance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}
@@ -222,7 +221,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
   text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
 .week-days{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}
 @media(min-width:760px){.week-days{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.day-card{background:#fff;border:1.5px solid var(--ink);box-shadow:3px 3px 0 rgba(20,23,26,.08)}
+.day-card{background:var(--surface);border:1.5px solid var(--frame);box-shadow:3px 3px 0 var(--shadow-soft)}
 .day-head{display:flex;align-items:flex-end;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--rule)}
 .day-head h2{font-size:27px;margin:2px 0 0}
 .day-when{margin:2px 0 0;padding:0 18px 0 0;border:0;background:transparent;color:var(--ink);
@@ -231,18 +230,18 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
   background-position:right 6px top 15px,right 1px top 15px;background-size:5px 5px;background-repeat:no-repeat}
 .day-when:hover{color:var(--red)}.day-kicker{font-size:9px;letter-spacing:.12em;color:var(--ink-2);text-transform:uppercase}
 .day-load{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700}.day-load::after{content:' pts';font-size:10px;color:var(--ink-2)}
-.day-config{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;padding:10px 12px;background:#FAFAF7;border-bottom:1px solid var(--rule)}
+.day-config{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--rule)}
 .day-config label>span{display:block;margin-bottom:3px;font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)}
-.day-config select{width:100%;min-width:0;padding:6px 5px;border:1px solid var(--rule);background:#fff;color:var(--ink);font:inherit;font-size:11px}
+.day-config select{width:100%;min-width:0;padding:6px 5px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);font:inherit;font-size:11px}
 .day-strength{padding:7px 14px;border-bottom:1px dashed var(--rule)}.day-strength .grp{margin:0 0 3px}
 .day-strength ul{list-style:none;padding:0;margin:0;color:var(--ink-2);font-size:11.5px}.day-strength li::before{content:'· '}
 .day-wod-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 14px 7px}
 .day-wod-head h3{font-size:23px;margin:0}.day-wod-head span{font-size:9.5px;text-transform:uppercase;color:var(--ink-2)}
 .day-wod ol{list-style:none;padding:0 14px;margin:0}.day-wod li{display:grid;grid-template-columns:auto minmax(0,auto) 1fr;gap:8px;
-  align-items:baseline;padding:6px 0;border-top:1px solid #EFEEE9;font-size:12.5px}.day-wod li>span:first-child{font-size:9px;color:var(--ink-2)}
+  align-items:baseline;padding:6px 0;border-top:1px solid var(--hair);font-size:12.5px}.day-wod li>span:first-child{font-size:9px;color:var(--ink-2)}
 .day-wod li>strong{overflow-wrap:anywhere}
 .day-wod .cue{padding:8px 14px 12px;margin:0;font-size:11.5px}
-.day-foot{display:flex;gap:10px;flex-wrap:wrap;padding:8px 14px;background:#FAFAF7;border-top:1px solid var(--rule);
+.day-foot{display:flex;gap:10px;flex-wrap:wrap;padding:8px 14px;background:var(--panel);border-top:1px solid var(--rule);
   color:var(--ink-2);font-size:10.5px}.day-foot b{color:var(--ink)}
 @media(max-width:620px){.week-intro,.week-controls{align-items:stretch;flex-direction:column}.week-actions{width:100%}
   .week-actions .btn{flex:1;justify-content:center}.week-balance{grid-template-columns:1fr}.day-config{grid-template-columns:1fr}}
