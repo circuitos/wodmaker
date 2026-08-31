@@ -19,7 +19,7 @@ The live site is auto-deployed from the default branch. Every other branch gets 
 
 ## How it works
 
-1. You set the context: where you are training (`gym`, `parque`, `casa`) and which strength block came before (squat, deadlift, press, pull, lower, full body, or none).
+1. You set the context: where you are training (`gym`, `parque`, `casa`) and what you lifted first. The strength block is a grid: tick the lifts you did, give each sets, reps and a working weight, and the app works out what that left you carrying. Store a one-rep max for a lift and the weight field shows the percentage too. Seven one-tap shortcuts fill the grid for a typical squat, deadlift, press, pull, lower-body or full-body day.
 2. A format is drawn by weight: AMRAP, for time, EMOM, intervals, ladder, chipper, or quality work. Each format carries its own slot count, time cap or round scheme, and a volume scale.
 3. Slots are filled from the movement pool. Every piece opens with a monostructural or full-body movement, then spreads across pushing, pulling, hinging, legs, core, and carries.
 4. Reps come from each movement's typical dose, scaled to the format's volume band and quantised to a sane step (no 37-rep sets of wall balls).
@@ -45,7 +45,8 @@ wodmaker/
 ├── index.html                  # Vite entry document
 ├── src/
 │   ├── moves.js                # the movement database and the six axes
-│   ├── formats.js              # workout formats, strength blocks, cues
+│   ├── formats.js              # workout formats, shortcut list, cues
+│   ├── lifts.js                # strength lifts and the arriving-load maths
 │   ├── i18n.js                 # every string the interface renders
 │   ├── generator.js            # candidate building and fault scoring
 │   ├── text.js                 # rep lines and plain-text export

@@ -12,7 +12,8 @@ One owner per fact: link, don't restate.
 | Architecture and tuning decisions, the load model | `docs/DESIGN.md` |
 | GitHub + Pages setup, troubleshooting | `docs/SETUP.md` |
 | The movement database (`MOVES`), the six axes | `src/moves.js` |
-| Workout formats, strength blocks, coaching cues | `src/formats.js` |
+| Workout formats and coaching cues | `src/formats.js` |
+| The strength lifts, and turning a session into an arriving load | `src/lifts.js` |
 | Every string the interface renders (`T`) | `src/i18n.js` |
 | Candidate building, fault scoring, quantisation | `src/generator.js` |
 | Rep lines and the plain-text export | `src/text.js` |
@@ -72,6 +73,9 @@ node scripts/build-preview-site.mjs /tmp/site   # read-only: compose the full Pa
 - **`load` shares are what the fault checker reads.** Every `MOVES` entry carries a `load` map over the six axes that should sum to about 1. If it sums to something else, that movement quietly gets more or less weight than intended in `faults()`, and no error is raised. Check the axis bars in the UI after adding a movement.
 - **`cost` is calibrated, not arbitrary.** One hard minute of work is about 20 units. A new movement priced by feel rather than against that scale will distort every volume band it lands in.
 - **`load` and `passes` on a `FORMATS` entry are one fact, not two knobs.** `load` is the whole conditioning piece in points; `passes` is how many times you go through the movement list. The generator divides them to get a round target and `sessionLoad()` multiplies back. Changing `load` moves what gets built and what the interface reports, together. Run `npm run smoke` and diff the report.
+- **A `LIFTS` entry is priced twice, and both matter.** `load` is the axis split, same shape and rule as `MOVES`. `toll` is effort per rep against the baseline of 1.0, and it is what stops a rep count from standing in for how much a lift takes out of you: a deadlift is `2.0` because 15 heavy pulls cost about what 30 reps of anything else would. Get `toll` wrong and the conditioning that follows is wrong by the same factor.
+- **`STRENGTH` no longer carries `pre` or `dampen`.** It is the shortcut list and its order, nothing more. What a shortcut is worth is computed from the lifts in `PRESET_ROWS`, so the shortcut and the same numbers typed by hand give the same answer. Do not reintroduce authored axis maps there.
+- **`dampen` is fitted, not authored.** Two coefficients in `lifts.js`, least-squares against the seven old presets. Leg work suppresses later conditioning about twice as hard as upper-body work, which is why a points total alone will not do. It has to be derived: no one can hand-tune a number for every combination of lifts someone might tick.
 - **`env` gates availability.** A movement missing `casa` is unreachable at home, and a home session that ends up with almost no pulling raises the soft `nopull` warning instead of failing. Adding home-friendly pulling means adding a movement, not tuning the scorer.
 - **`generate()` degrades rather than fails.** It tries 300 candidates and returns the least-faulty one if none is clean, so a bad data edit shows up as workouts that always carry warnings, not as an exception.
 - **Every `localStorage` access has to stay guarded.** `src/prefs.js` wraps it because the accessor itself throws in private windows and where site data is blocked, not just returns null. A preference that cannot be saved is not an error worth surfacing: the app works, it just forgets. Do not reach for `localStorage` directly elsewhere.

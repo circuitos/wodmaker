@@ -242,8 +242,24 @@ The seven presets stop being the model. They can survive as one-tap shortcuts th
 
 A lifts table has to be written: maybe a dozen entries with axis shares and tolls. That is data work, and it is the part that decides whether the feature is any good.
 
-## Open questions
+## Decisions, and what was built
 
-1. **A fixed list of lifts, or editable?** A fixed dozen (back squat, front squat, deadlift, RDL, bench, overhead press, weighted pull-up, barbell row, hip thrust, lunge) covers most training and keeps the grid scannable. Editable means storing user-defined lifts and asking the user for axis shares, which is not a thing anyone wants to fill in.
-2. **Keep the presets as shortcuts, or drop them?** They are useful on a day you cannot be bothered to type numbers.
-3. **What is the weighted sit-up?** 95 kg off a 130 kg max is not a standard barbell lift, and its axis shares decide whether the generator thinks you hammered your core, your hip flexors, or your legs. Machine, decline bench with a plate, GHD? This one I cannot guess.
+All three settled, and the grid is built.
+
+**A fixed dozen of lifts**, not editable: back squat, front squat, deadlift, RDL, hip thrust, barbell lunge, bench, overhead press, push press, weighted pull-up, barbell row, power clean. Editable would have meant asking for axis shares, which nobody wants to fill in.
+
+**The seven presets stay, as one-tap shortcuts.** They are now rows for the grid rather than their own authored axis maps, so a shortcut and the same numbers typed by hand give the same answer. `STRENGTH` keeps only the list and its order.
+
+**The weighted sit-up was a barbell back squat with a rack.** So the worked example is squat 5x4 at 95 kg off a 130 kg max, then bench 5x4 at 75 kg off 87.5, which the model puts at 212 points: between the old `lower` preset (185) and `full` (260), and matching no single dropdown option. That gap is the whole reason the dropdown did not fit.
+
+### How close the shortcuts stayed
+
+Each preset's rows were tuned to land on what it used to be worth. Points come within 5% (`lower` and `full` land exactly), axis shares within 1 percentage point except `full` at 10, and `dampen` within 0.06.
+
+Across the sweep the behaviour change is small: session load moved at most 2.5% (squat), axis shares by at most 0.2 percentage points, `nopull` from 2623 to 2616 occurrences, hard faults still zero, item counts unchanged. That is the cost of replacing seven hand-tuned constants with a model, and it is small enough to accept deliberately.
+
+### Superseded
+
+1. ~~**A fixed list of lifts, or editable?**~~ A fixed dozen (back squat, front squat, deadlift, RDL, bench, overhead press, weighted pull-up, barbell row, hip thrust, lunge) covers most training and keeps the grid scannable. Editable means storing user-defined lifts and asking the user for axis shares, which is not a thing anyone wants to fill in.
+2. ~~**Keep the presets as shortcuts, or drop them?**~~ Kept.
+3. ~~**What is the weighted sit-up?**~~ A barbell back squat.

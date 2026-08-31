@@ -23,15 +23,18 @@ export const FORMATS = [
     load: () => 100,            passes: () => 1 },
 ];
 
-/* The strength block that came before. Pre-loads the axes and damps volume. */
+/* The strength-block shortcuts, in the order they appear. What each one is
+   worth used to be hand-authored here as a `pre` axis map and a `dampen`
+   factor. It is computed now, from the actual lifts in PRESET_ROWS, so this is
+   just the list and its order. See src/lifts.js. */
 export const STRENGTH = [
-  { id: "none",     dampen: 1.0,  pre: {} },
-  { id: "squat",    dampen: 0.85, pre: { piernas: 90, posterior: 30, core: 20 } },
-  { id: "deadlift", dampen: 0.82, pre: { posterior: 95, agarre: 45, piernas: 25, core: 20 } },
-  { id: "press",    dampen: 0.95, pre: { empuje: 85, core: 20, traccion: 10 } },
-  { id: "pull",     dampen: 0.92, pre: { traccion: 85, agarre: 40, core: 15 } },
-  { id: "lower",    dampen: 0.8,  pre: { piernas: 70, posterior: 70, core: 25, agarre: 20 } },
-  { id: "full",     dampen: 0.72, pre: { piernas: 55, posterior: 55, empuje: 50, traccion: 45, agarre: 30, core: 25 } },
+  { id: "none" },
+  { id: "squat" },
+  { id: "deadlift" },
+  { id: "press" },
+  { id: "pull" },
+  { id: "lower" },
+  { id: "full" },
 ];
 
 export const CUES = {

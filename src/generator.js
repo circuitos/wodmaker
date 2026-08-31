@@ -1,5 +1,6 @@
 import { AXES, MOVES } from "./moves.js";
-import { FORMATS, STRENGTH } from "./formats.js";
+import { FORMATS } from "./formats.js";
+import { arrivingFromPreset } from "./lifts.js";
 /* =========================== GENERATOR =========================== */
 
 export const rnd = (n) => Math.floor(Math.random() * n);
@@ -40,11 +41,6 @@ export function axisVector(items) {
     for (const [k, share] of Object.entries(it.move.load)) v[k] += work * share;
   }
   return v;
-}
-
-/* The seven presets, resolved to the same shape anything else arrives in. */
-export function arrivingFromPreset(id) {
-  return STRENGTH.find((s) => s.id === id) || STRENGTH[0];
 }
 
 /* What one round should cost. The inverse of sessionLoad below: that one

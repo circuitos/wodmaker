@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { AXES } from "../src/moves.js";
 import { FORMATS, STRENGTH } from "../src/formats.js";
+import { arrivingFromPreset } from "../src/lifts.js";
 import { generate, sessionLoad } from "../src/generator.js";
 
 const SAMPLES = Number(process.env.SAMPLES || 400);
@@ -60,7 +61,7 @@ for (const env of ENVS) {
   for (const st of STRENGTH) {
     byStrength[st.id] ||= { load: stat(), cond: stat(), items: stat(), faults: stat() };
     for (let i = 0; i < SAMPLES; i++) {
-      const c = generate(env, st.id);
+      const c = generate(env, arrivingFromPreset(st.id));
       total++;
       if (!c) { nulls++; continue; }
 

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { AXES } from "./moves.js";
 import { CUES, STRENGTH } from "./formats.js";
+import { LIFTS, PRESET_ROWS, arrivingFromLifts } from "./lifts.js";
 import { T } from "./i18n.js";
 import { generate, pick, sessionLoad } from "./generator.js";
 import { asText, headline } from "./text.js";
@@ -81,6 +82,29 @@ const CSS = `
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--board)}
 .chip b{display:block;font-size:14px;font-weight:600}
 .chip span{display:block;font-size:10.5px;opacity:.7;margin-top:2px;line-height:1.25}
+.shortcuts{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+.scut{border:1px solid var(--rule);background:transparent;border-radius:2px;padding:4px 7px;
+  font:inherit;font-size:11px;color:var(--ink-2);cursor:pointer}
+.scut:hover{border-color:var(--ink);color:var(--ink)}
+.lifts{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.lift{border-bottom:1px solid #EFEEE9;padding:5px 0}
+.lift.on{background:#FAFAF7}
+.lname{display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer}
+.lname input{margin:0;accent-color:var(--ink)}
+.lift.on .lname{font-weight:600}
+.lfields{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:5px 0 2px 22px;font-size:12px}
+.num{width:38px;padding:3px 4px;border:1px solid var(--rule);border-radius:2px;background:#fff;
+  font:inherit;font-size:12px;color:var(--ink);text-align:right}
+.num:focus{outline:2px solid var(--ink);outline-offset:1px}
+.num.kg{width:52px;margin-left:5px}
+.x{color:var(--ink-2)}
+.unit,.pct{font-size:11px;color:var(--ink-2)}
+.rm{display:flex;align-items:center;gap:4px;margin-left:8px;font-size:10.5px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.rm .num{width:52px}
+.pct{margin-left:auto;font-weight:500}
+.ltotal{display:flex;align-items:center;gap:8px;margin:10px 0 0;font-size:13px}
+.ltotal .mono{font-weight:600}
 .sel{width:100%;padding:10px;border:1.5px solid var(--ink);border-radius:2px;background:transparent;
   font:inherit;font-size:14px;color:var(--ink)}
 .block{margin-bottom:22px}
@@ -158,7 +182,13 @@ export default function App() {
   const [lang, setLang] = useState(() => loadPref("lang", "es"));
   const [meterOpen, setMeterOpen] = useState(() => loadPref("meterOpen", true));
   const [env, setEnv] = useState("gym");
-  const [strengthId, setStrengthId] = useState("none");
+  /* What you lifted before this: one row per ticked lift. `kg` is what you put
+     on the bar; `pct` only carries a preset's intent when no 1RM is on file to
+     turn it into kilos. */
+  const [liftRows, setLiftRows] = useState(() => loadPref("liftRows", []));
+  /* One-rep maxes are a fact about you, not about today, so they outlive the
+     session and the reload. */
+  const [oneRM, setOneRM] = useState(() => loadPref("oneRM", {}));
   const [wod, setWod] = useState(null);
   const [locks, setLocks] = useState({});
   const [copied, setCopied] = useState(false);
@@ -168,11 +198,32 @@ export default function App() {
 
   useEffect(() => { savePref("lang", lang); }, [lang]);
   useEffect(() => { savePref("meterOpen", meterOpen); }, [meterOpen]);
+  useEffect(() => { savePref("liftRows", liftRows); }, [liftRows]);
+  useEffect(() => { savePref("oneRM", oneRM); }, [oneRM]);
   const t = T[lang];
+
+  const pctFor = (r) => (oneRM[r.liftId] > 0 && r.kg > 0 ? r.kg / oneRM[r.liftId] : r.pct);
+  const arriving = useMemo(
+    () => arrivingFromLifts(liftRows.map((r) => ({ ...r, pct: pctFor(r) }))),
+    // eslint-disable-next-line
+    [liftRows, oneRM]);
+
+  const toggleLift = (liftId) => setLiftRows((rows) =>
+    rows.some((r) => r.liftId === liftId)
+      ? rows.filter((r) => r.liftId !== liftId)
+      : [...rows, { liftId, sets: 5, reps: 5, kg: 0, pct: undefined }]);
+
+  const editRow = (liftId, field, value) => setLiftRows((rows) =>
+    rows.map((r) => (r.liftId === liftId
+      ? { ...r, [field]: value === "" ? 0 : Number(value), ...(field === "kg" ? { pct: undefined } : {}) }
+      : r)));
+
+  const applyPreset = (id) => setLiftRows(
+    PRESET_ROWS[id].map((r) => ({ ...r, kg: oneRM[r.liftId] > 0 ? Math.round(oneRM[r.liftId] * r.pct) : 0 })));
 
   const roll = (keepLocks = false) => {
     const locked = keepLocks && wod ? wod.items.filter((it) => locks[it.move.id]) : [];
-    const c = generate(env, strengthId, locked);
+    const c = generate(env, arriving, locked);
     if (!c) return;
     c.cue = pick(CUES[lang][c.fmt.id]);
     setWod(c);
@@ -180,7 +231,7 @@ export default function App() {
     setCopied(false);
   };
 
-  useEffect(() => { roll(false); /* eslint-disable-next-line */ }, [env, strengthId]);
+  useEffect(() => { roll(false); /* eslint-disable-next-line */ }, [env, arriving]);
   useEffect(() => { if (wod) setWod({ ...wod, cue: pick(CUES[lang][wod.fmt.id]) }); /* eslint-disable-next-line */ }, [lang]);
 
   const text = useMemo(() => (wod ? asText(wod, lang, env) : ""), [wod, lang, env]);
@@ -231,7 +282,7 @@ export default function App() {
     const removed = wod.items.find((it) => it.move.id === id);
     const keep = wod.items.filter((it) => it.move.id !== id);
     const fixed = { fmt: wod.fmt, cap: wod.cap, rounds: wod.rounds, slots: [removed.move.pat] };
-    const c = generate(env, strengthId, keep, fixed);
+    const c = generate(env, arriving, keep, fixed);
     if (!c) return;
     c.cue = wod.cue;
     setWod(c);
@@ -276,9 +327,59 @@ export default function App() {
             </div>
             <div className="block">
               <p className="lbl">{t.before}</p>
-              <select className="sel" value={strengthId} onChange={(e) => setStrengthId(e.target.value)}>
-                {STRENGTH.map((s) => <option key={s.id} value={s.id}>{t.strength[s.id]}</option>)}
-              </select>
+
+              <div className="shortcuts">
+                {STRENGTH.map((sp) => (
+                  <button key={sp.id} className="scut" onClick={() => applyPreset(sp.id)}>
+                    {t.strength[sp.id]}
+                  </button>
+                ))}
+              </div>
+
+              <ul className="lifts">
+                {LIFTS.map((lift) => {
+                  const row = liftRows.find((r) => r.liftId === lift.id);
+                  const rm = oneRM[lift.id] || 0;
+                  const pct = row ? pctFor(row) : undefined;
+                  return (
+                    <li key={lift.id} className={row ? "lift on" : "lift"}>
+                      <label className="lname">
+                        <input type="checkbox" checked={!!row} onChange={() => toggleLift(lift.id)} />
+                        <span>{lift[lang]}</span>
+                      </label>
+                      {row && (
+                        <div className="lfields">
+                          <input className="num mono" type="number" min="1" max="20" value={row.sets || ""}
+                            aria-label={t.sets} onChange={(e) => editRow(lift.id, "sets", e.target.value)} />
+                          <span className="x">&times;</span>
+                          <input className="num mono" type="number" min="1" max="30" value={row.reps || ""}
+                            aria-label={t.reps} onChange={(e) => editRow(lift.id, "reps", e.target.value)} />
+                          <input className="num kg mono" type="number" min="0" step="2.5" value={row.kg || ""}
+                            aria-label="kg" placeholder="kg" onChange={(e) => editRow(lift.id, "kg", e.target.value)} />
+                          <span className="unit">kg</span>
+                          <span className="rm">
+                            {t.oneRM}
+                            <input className="num mono" type="number" min="0" step="2.5" value={rm || ""}
+                              aria-label={`${t.oneRM} ${lift[lang]}`}
+                              onChange={(e) => setOneRM({ ...oneRM, [lift.id]: Number(e.target.value) || 0 })} />
+                          </span>
+                          <span className="pct mono">
+                            {pct ? `${Math.round(pct * 100)}%` : t.noRM}
+                          </span>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {arriving.points > 0 && (
+                <p className="ltotal">
+                  <span className="lbl" style={{ margin: 0 }}>{t.strengthTotal}</span>
+                  <span className="mono">{Math.round(arriving.points)}</span>
+                  <button className="mtoggle disp" onClick={() => setLiftRows([])}>{t.clearLifts}</button>
+                </p>
+              )}
             </div>
           </aside>
 
