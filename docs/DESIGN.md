@@ -103,7 +103,17 @@ Settled: the control scales the workout the app already drew. It does not set a 
 
 What this costs, stated plainly: "hard" is not a fixed amount of work. A hard interval piece is still lighter than a soft AMRAP. That follows from keeping the spread, and it is the reason the steps are named rather than numbered in minutes.
 
-**One place this will bite later.** A weekly plan that spreads muscle groups across two to four days needs to compare days against each other, and a relative multiplier gives no common scale to compare them on. If the week planner gets built, the absolute-target idea comes back with it. Not a reason to build it now, but the reason to expect it again.
+## The week planner, and what it needs from this
+
+The planner is coming, so the load model has to serve it without making today's control absolute. It does, and the compromise is smaller than it first looked.
+
+**The control stays relative. The readout becomes absolute.**
+
+`sessionLoad()` gives every generated workout a number on one scale. That is exactly the common scale a week planner needs to weigh Monday against Thursday. The user never sets that number: they pick soft, normal or hard, which is a multiplier. The planner sets it per day by turning the same multiplier and reading `sessionLoad()` back.
+
+So the answer to "how do you balance a week when hard is relative" is that the planner does not use the named steps at all. It uses `intensity` as a number and can see what it got. The names are an affordance over a knob the planner turns directly. No new mechanism, and no overriding the format draw for a single day.
+
+There is one more thing the planner needs, and it is cheap to design for now. `STRENGTH.pre` is currently "the axis load the strength block left you carrying". A week needs the same idea between days: Tuesday arrives carrying Monday's axis vector, decayed. Same concept, different source. So `pre` should stop being something looked up from a `STRENGTH` entry and become a plain axis vector handed to `buildCandidate` and `faults`. That is a rename and a re-source with no new arithmetic, and it is step 5 below.
 
 ## Order of work
 
@@ -122,6 +132,8 @@ This has to come before step 3. There are no tests here and the output is random
 It is done when the smoke numbers have not moved.
 
 **4. Add the control.** Three chips wired to one multiplier. Small, now that there is somewhere to put it.
+
+**5. Generalise `pre` from a strength block to an arriving axis load.** Groundwork for the week planner, per the section above. Its own commit, after the load model is unified, and before any planner work starts.
 
 ## The control itself
 
