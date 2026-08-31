@@ -147,7 +147,13 @@ The smoke report came back byte-identical over 8400 workouts, and the number sho
 
 Two float details, checked rather than assumed. `fortime` at 3 rounds now computes `190 / 3` where it used to compute `(130 / 3 + 250 / 3) / 2`, which differ by one unit in the last place; it changed no output. And the old EMOM multiplier `cap / items.length * (items.length === 3 ? 3 : items.length)` was not exactly `cap` in floating point, so replacing it with `cap` is a correction as well as a simplification; it also changed no displayed number.
 
-**4. Add the control.** Three chips wired to one multiplier. Small, now that there is somewhere to put it.
+**4. Add the control. Done.** Three chips, soft / normal / hard, wired to `intensity` on `roundTarget`. They sit under "where you train" and above the strength grid: both shape the workout, and the grid below is about what already happened.
+
+`generate()` moved to an options object on the way, `generate(env, arriving, { locked, fixed, intensity })`, because it was heading for five positional parameters with three optional.
+
+**The multipliers are calibrated against what they deliver rather than what they read.** Asking for 0.8 does not produce 80% of the work: `quantise` floors every movement at half its minimum dose and `buildCandidate` clamps rep scaling at 0.55, so about 60% of the request survives. Measured over 3000 workouts a step, 0.6 gives -16% and 1.4 gives +24%, a 1.47x span from soft to hard, or 7.7 against 11.3 hard minutes.
+
+The asymmetry is a fact rather than an oversight. Reps can be scaled up but the floors stop them going down, so about -16% is the softest this mechanism reaches at all. A genuinely light session would need fewer movements or fewer rounds, which is a different change and not one this commit makes. It is the same clamp that makes the EMOM band unreachable, showing up in a second place.
 
 **5. Generalise `pre` from a strength block to an arriving axis load.** Groundwork for the week planner, per the section above. Its own commit, after the load model is unified, and before any planner work starts.
 

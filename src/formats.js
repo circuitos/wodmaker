@@ -23,6 +23,30 @@ export const FORMATS = [
     load: () => 100,            passes: () => 1 },
 ];
 
+/* The soft / normal / hard control.
+   A multiplier on the round target, relative to whatever format came up rather
+   than an absolute amount of work: a hard interval piece is still lighter than
+   a soft AMRAP. See docs/DESIGN.md for why it is relative.
+
+   These are chosen for what they deliver, not for how they read. Asking for
+   0.8 does not produce 80% of the work: `quantise` floors every movement at
+   half its minimum dose and `buildCandidate` clamps the rep scaling to 0.55,
+   so roughly 60% of the request survives. 0.6 lands at about -16%, 1.4 at
+   about +24%.
+
+   The asymmetry is real rather than sloppy. Work can be added by scaling reps
+   but not removed the same way, because the floors stop reps going lower: -16%
+   is close to the softest this mechanism can produce at all. Genuinely lighter
+   sessions would need fewer movements or fewer rounds, which is a different
+   change. Re-measure with scripts/smoke.js if these move. */
+export const INTENSITY = [
+  { id: "soft", k: 0.6 },
+  { id: "normal", k: 1.0 },
+  { id: "hard", k: 1.4 },
+];
+
+export const intensityK = (id) => (INTENSITY.find((i) => i.id === id) || INTENSITY[1]).k;
+
 /* The strength-block shortcuts, in the order they appear. What each one is
    worth used to be hand-authored here as a `pre` axis map and a `dampen`
    factor. It is computed now, from the actual lifts in PRESET_ROWS, so this is

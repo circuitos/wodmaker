@@ -1,7 +1,8 @@
 export const T = {
   es: {
     title: "Generador de WOD", sub: "A partir de 55 sesiones reales",
-    where: "Dónde entrenas", gym: "Gimnasio", parque: "Parque", casa: "Casa",
+    where: "Dónde entrenas", effort: "Cuánto aprietas",
+    intensity: { soft: "suave", normal: "normal", hard: "duro" }, gym: "Gimnasio", parque: "Parque", casa: "Casa",
     whereHint: { gym: "Todo el material", parque: "Barra de dominadas, banco, suelo", casa: "Sin material" },
     before: "Bloque de fuerza previo",
     shortcuts: "Atajos", sets: "series", reps: "reps", oneRM: "1RM",
@@ -28,7 +29,8 @@ export const T = {
   },
   en: {
     title: "WOD Generator", sub: "Built from 55 real sessions",
-    where: "Where you train", gym: "Gym", parque: "Park", casa: "Home",
+    where: "Where you train", effort: "How hard",
+    intensity: { soft: "soft", normal: "normal", hard: "hard" }, gym: "Gym", parque: "Park", casa: "Home",
     whereHint: { gym: "Full equipment", parque: "Pull-up bar, bench, ground", casa: "No equipment" },
     before: "Strength block before",
     shortcuts: "Shortcuts", sets: "sets", reps: "reps", oneRM: "1RM",

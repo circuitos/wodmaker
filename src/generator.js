@@ -78,7 +78,7 @@ export function itemCost(it) {
   return it.reps * it.move.cost * (it.move.side ? 2 : 1);
 }
 
-export function buildCandidate(env, arriving, locked, fixed) {
+export function buildCandidate(env, arriving, { locked = [], fixed = null, intensity = 1 } = {}) {
   const fmt = fixed ? fixed.fmt : weightedFormat();
   const st = arriving;
   const nSlots = fixed ? null : pick(fmt.slots);
@@ -111,7 +111,7 @@ export function buildCandidate(env, arriving, locked, fixed) {
   if (items.length < 2) return null;
 
   // Scale volume analytically into the band for this format.
-  const target = roundTarget(fmt, { cap, rounds }, st.dampen);
+  const target = roundTarget(fmt, { cap, rounds }, st.dampen, intensity);
   const current = items.reduce((s, it) => s + itemCost(it), 0);
   if (current > 0) {
     const k = clamp(target / current, 0.55, 1.9);
@@ -149,12 +149,17 @@ export function faults(c, env) {
    should damp what follows. Today it comes from the strength block you did
    first; a week planner will hand it yesterday's session, decayed. Either
    source, same shape: { pre: { axis: points }, dampen }. A preset id is still
-   accepted for convenience. */
-export function generate(env, arriving, locked = [], fixed = null) {
+   accepted for convenience.
+
+   `opts` carries the rest: `locked` movements to keep, a `fixed` shape when
+   re-rolling one slot, and `intensity`, the soft / normal / hard multiplier.
+   An object rather than three more positional arguments, because the week
+   planner will want to pass its own. */
+export function generate(env, arriving, opts = {}) {
   if (typeof arriving === "string") arriving = arrivingFromPreset(arriving);
   let best = null, bestScore = Infinity;
   for (let i = 0; i < 300; i++) {
-    const c = buildCandidate(env, arriving, locked, fixed);
+    const c = buildCandidate(env, arriving, opts);
     if (!c) continue;
     const f = faults(c, env);
     const hard = f.filter((x) => x.hard).length;

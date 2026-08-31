@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { AXES } from "./moves.js";
-import { CUES, STRENGTH } from "./formats.js";
+import { CUES, INTENSITY, STRENGTH, intensityK } from "./formats.js";
 import { ACCESSORY, LIFTS, PRESET_ROWS, arrivingFromLifts, moveById } from "./lifts.js";
 import { T } from "./i18n.js";
 import { generate, pick, sessionLoad } from "./generator.js";
@@ -82,6 +82,12 @@ const CSS = `
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--board)}
 .chip b{display:block;font-size:14px;font-weight:600}
 .chip span{display:block;font-size:10.5px;opacity:.7;margin-top:2px;line-height:1.25}
+.seg{display:flex;border:1.5px solid var(--ink);border-radius:2px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;padding:9px 6px;font:inherit;font-size:11px;
+  font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--board)}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .shortcuts{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
 .scut{border:1px solid var(--rule);background:transparent;border-radius:2px;padding:4px 7px;
   font:inherit;font-size:11px;color:var(--ink-2);cursor:pointer}
@@ -183,6 +189,7 @@ const IconSwap = () => (
 export default function App() {
   const [lang, setLang] = useState(() => loadPref("lang", "es"));
   const [meterOpen, setMeterOpen] = useState(() => loadPref("meterOpen", true));
+  const [intensity, setIntensity] = useState(() => loadPref("intensity", "normal"));
   const [env, setEnv] = useState("gym");
   /* What you lifted before this: one row per ticked lift. `kg` is what you put
      on the bar; `pct` only carries a preset's intent when no 1RM is on file to
@@ -202,6 +209,7 @@ export default function App() {
   useEffect(() => { savePref("meterOpen", meterOpen); }, [meterOpen]);
   useEffect(() => { savePref("liftRows", liftRows); }, [liftRows]);
   useEffect(() => { savePref("oneRM", oneRM); }, [oneRM]);
+  useEffect(() => { savePref("intensity", intensity); }, [intensity]);
   const t = T[lang];
 
   const pctFor = (r) => (oneRM[r.liftId] > 0 && r.kg > 0 ? r.kg / oneRM[r.liftId] : r.pct);
@@ -230,7 +238,7 @@ export default function App() {
 
   const roll = (keepLocks = false) => {
     const locked = keepLocks && wod ? wod.items.filter((it) => locks[it.move.id]) : [];
-    const c = generate(env, arriving, locked);
+    const c = generate(env, arriving, { locked, intensity: intensityK(intensity) });
     if (!c) return;
     c.cue = pick(CUES[lang][c.fmt.id]);
     setWod(c);
@@ -238,7 +246,7 @@ export default function App() {
     setCopied(false);
   };
 
-  useEffect(() => { roll(false); /* eslint-disable-next-line */ }, [env, arriving]);
+  useEffect(() => { roll(false); /* eslint-disable-next-line */ }, [env, arriving, intensity]);
   useEffect(() => { if (wod) setWod({ ...wod, cue: pick(CUES[lang][wod.fmt.id]) }); /* eslint-disable-next-line */ }, [lang]);
 
   const text = useMemo(() => (wod ? asText(wod, lang, env) : ""), [wod, lang, env]);
@@ -289,7 +297,7 @@ export default function App() {
     const removed = wod.items.find((it) => it.move.id === id);
     const keep = wod.items.filter((it) => it.move.id !== id);
     const fixed = { fmt: wod.fmt, cap: wod.cap, rounds: wod.rounds, slots: [removed.move.pat] };
-    const c = generate(env, arriving, keep, fixed);
+    const c = generate(env, arriving, { locked: keep, fixed, intensity: intensityK(intensity) });
     if (!c) return;
     c.cue = wod.cue;
     setWod(c);
@@ -329,6 +337,15 @@ export default function App() {
                   <button key={e} className="chip" aria-pressed={env === e} onClick={() => setEnv(e)}>
                     <b>{t[e]}</b><span>{t.whereHint[e]}</span>
                   </button>
+                ))}
+              </div>
+            </div>
+            <div className="block">
+              <p className="lbl">{t.effort}</p>
+              <div className="seg">
+                {INTENSITY.map((i) => (
+                  <button key={i.id} aria-pressed={intensity === i.id}
+                    onClick={() => setIntensity(i.id)}>{t.intensity[i.id]}</button>
                 ))}
               </div>
             </div>
