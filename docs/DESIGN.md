@@ -37,19 +37,21 @@ The answer is right. A 10-minute AMRAP should be about 10 minutes of work. But t
 
 ## Problem 2: the format decides how hard your session is, and you do not pick the format
 
-| Format | How often it comes up | Session points | Hard minutes |
-|---|---|---|---|
-| AMRAP | 22% | 164 to 246 | 8.2 to 12.3 |
-| For time | 28% | 190 | 9.5 |
-| EMOM | 20% | 120 to 180 | 6.0 to 9.0 |
-| Intervals | 10% | 68 to 81 | 3.4 to 4.0 |
-| Ladder | 8% | 99 | 5.0 |
-| Chipper | 7% | 155 | 7.8 |
-| Quality | 5% | 100 | 5.0 |
+Measured over 8400 generated workouts (`npm run smoke`, seed 1). "Conditioning" is the workout alone; "session" adds the strength block, averaged over all seven blocks.
 
-The format is picked at random. Some come up more often than others, but you have no say in which one you get. The same inputs give you a 3.4 minute session on one press and a 12.3 minute one on the next. That is a 3.6x gap.
+| Format | How often it comes up | Conditioning mean | p10 to p90 | Session mean |
+|---|---:|---:|---:|---:|
+| AMRAP | 22.5% | 190.5 | 146 to 236 | 325.0 |
+| For time | 24.3% | 174.4 | 144 to 204 | 311.0 |
+| EMOM | 24.1% | 227.1 | 126 to 343 | 356.4 |
+| Intervals | 6.1% | 81.7 | 59 to 108 | 211.1 |
+| Ladder | 9.4% | 91.7 | 77 to 105 | 216.3 |
+| Chipper | 7.9% | 132.8 | 112 to 153 | 265.7 |
+| Quality | 5.8% | 74.5 | 54 to 93 | 199.4 |
 
-Some of it is honest. An interval piece with rest really is less work than a twelve minute AMRAP. But 3.6x is a wide gap, and right now it is the biggest single thing deciding how hard your workout turns out.
+The format is picked at random. Some come up more often than others, but you have no say in which one you get. The lightest format averages 74.5 points of conditioning and the heaviest 227.1, so which format comes up moves the workload about threefold.
+
+Some of that is honest. An interval piece with rest really is less work than a twelve minute AMRAP.
 
 **Reviewed and accepted (see Decisions).** The spread stays. Formats genuinely differ in how much work they are, and the variety is wanted.
 
@@ -68,6 +70,20 @@ Worth writing down, because it looks like it should be simple and is not: **`dam
 - `volumeBand` returns a range, `[lo, hi]`, and the only thing done with it is take the middle. It should be one number.
 - The EMOM line inside `dayWork` is `cap / items.length * (items.length === 3 ? 3 : items.length)`. Whatever `items.length` is, that works out to `cap`. It is the leftover of somebody adjusting a number until the output looked right.
 - `dayWork` is one expression with five nested ternaries, and it is the only thing in `App.jsx` that knows anything about how formats work.
+
+## What the baseline run turned up
+
+Three things the sweep found that reading the code did not.
+
+**The EMOM volume band is unreachable.** `volumeBand` asks for 15 points in a minute. The measured conditioning works out at 227 points over a mean 9.5 minute cap, which is about 24 points a minute, 60% over the ask. The cause is `quantise`: its floor is `max(step, lo * 0.5)`, so a movement cannot be prescribed below half its minimum dose no matter what the target says. Ask three movements for 5 points each and the floors hand back 8. The band is not steering EMOM at all; the clamps are.
+
+This does not have to be fixed to unify the model, and it should not be fixed in the same commit. Step 3 preserves whatever the clamps do today by construction, because it sets each format's `load` to the current band midpoint times the current pass count. Worth a separate decision afterwards: either raise the EMOM band to something reachable, or accept that quantisation is the real floor and say so.
+
+**The `nopull` warning fires on 93.7% of home workouts.** Not 31% as the overall count suggests: it is zero at the gym and in the park, and nearly universal at home. A warning that fires on almost every session in its category carries no information, so today it reads as decoration. `CLAUDE.md` already names the cause in its gotchas: there is no home-friendly pulling movement in `MOVES`, and the fix is a movement, not a scorer tweak. The number just says how bad it is.
+
+**Nothing ever degrades.** Zero of 8400 workouts came back carrying a hard fault, so the 300-candidate loop in `generate()` always finds a clean one. The fallback path exists and is correct, but it has never been the thing that runs. Good to know before trusting it to absorb anything.
+
+All 53 movements are reachable; none went unused across the sweep.
 
 ## The fix
 

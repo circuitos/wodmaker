@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "oxlint",
-    "build:site": "node scripts/build-preview-site.mjs"
+    "build:site": "node scripts/build-preview-site.mjs",
+    "smoke": "node scripts/smoke.js",
+    "smoke:quick": "SAMPLES=100 node scripts/smoke.js"
   },
   "dependencies": {
     "react": "^19.2.8",
