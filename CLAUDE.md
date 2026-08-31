@@ -17,6 +17,7 @@ One owner per fact: link, don't restate.
 | Candidate building, fault scoring, quantisation | `src/generator.js` |
 | Rep lines and the plain-text export | `src/text.js` |
 | Barbell plate maths | `src/plates.js` |
+| Preferences that survive a reload | `src/prefs.js` |
 | Styles (`CSS`), form wiring, calendar export | `src/App.jsx` |
 | Pages site composition (root + branch previews) | `scripts/build-preview-site.mjs` |
 | Generator regression sweep | `scripts/smoke.js`, output in `out/smoke-report.md` |
@@ -73,6 +74,7 @@ node scripts/build-preview-site.mjs /tmp/site   # read-only: compose the full Pa
 - **`load` and `passes` on a `FORMATS` entry are one fact, not two knobs.** `load` is the whole conditioning piece in points; `passes` is how many times you go through the movement list. The generator divides them to get a round target and `sessionLoad()` multiplies back. Changing `load` moves what gets built and what the interface reports, together. Run `npm run smoke` and diff the report.
 - **`env` gates availability.** A movement missing `casa` is unreachable at home, and a home session that ends up with almost no pulling raises the soft `nopull` warning instead of failing. Adding home-friendly pulling means adding a movement, not tuning the scorer.
 - **`generate()` degrades rather than fails.** It tries 300 candidates and returns the least-faulty one if none is clean, so a bad data edit shows up as workouts that always carry warnings, not as an exception.
+- **Every `localStorage` access has to stay guarded.** `src/prefs.js` wraps it because the accessor itself throws in private windows and where site data is blocked, not just returns null. A preference that cannot be saved is not an error worth surfacing: the app works, it just forgets. Do not reach for `localStorage` directly elsewhere.
 - **UI copy lives in `T`, keyed by language.** Both `es` and `en` have to be updated together; a missing key renders as `undefined` in the interface.
 
 ## Doc Upkeep

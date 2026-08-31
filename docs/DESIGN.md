@@ -163,12 +163,12 @@ Three steps, named: **soft / normal / hard** (`suave / normal / duro`). Names ra
 
 **Named steps, not minutes.** Soft, normal, hard. See "The control itself" for why.
 
-**The plate meter stays, and gets a show/hide.** It draws a number you did not choose, which was the argument for cutting it, but it is worth keeping and hiding. The app already has this pattern: `calOpen` opens and closes the calendar block. The toggle belongs on the `.mhead` row, which already holds the label and the number.
+**The plate meter stays, and gets a show/hide. Done.** It draws a number you did not choose, which was the argument for cutting it, but it is worth keeping and hiding. The app already has this pattern: `calOpen` opens and closes the calendar block. The toggle belongs on the `.mhead` row, which already holds the label and the number.
 
 This introduces the first saved preference in the app. Nothing is persisted today: reload and you are back to Spanish, gym, no strength block. Worth knowing before building it, because once there is somewhere to keep a preference, **language is the more valuable thing to keep**. Resetting the plate meter on reload is mildly annoying; resetting an English speaker to Spanish every visit is worse. Build the store once and put both in it.
 
 A note on wording: `sessionStorage` is forgotten when the tab closes, `localStorage` is not. For "I do not want to see this meter", `localStorage` is almost certainly the intent. Both are one line.
 
-This is independent of the load refactor and can land before it, after it, or on its own.
+Built as `src/prefs.js`, holding both the meter's visibility and the language. Verified in a browser: both survive a reload, a fresh visitor gets the defaults (meter shown, Spanish), and with `localStorage` rigged to throw the page still renders and the toggle still works for the session.
 
 **The 3.6x spread is not a bug.** Formats differ in how much work they are, and that variety is wanted. Recorded in Problem 2, which now explains what the spread costs rather than arguing it should go. The knock-on is that the load control is relative rather than absolute, which is what makes step 4 small.

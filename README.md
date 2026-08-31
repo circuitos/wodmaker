@@ -50,6 +50,7 @@ wodmaker/
 │   ├── generator.js            # candidate building and fault scoring
 │   ├── text.js                 # rep lines and plain-text export
 │   ├── plates.js               # barbell plate maths
+│   ├── prefs.js                # the few choices that survive a reload
 │   ├── App.jsx                 # the interface
 │   ├── main.jsx                # React root
 │   └── index.css               # global reset (app styles live in App.jsx)
@@ -57,7 +58,10 @@ wodmaker/
 │   ├── favicon.svg
 │   └── robots.txt              # keeps /previews/ out of search engines
 ├── scripts/
+│   ├── smoke.js                # generator regression sweep (npm run smoke)
 │   └── build-preview-site.mjs  # composes the Pages site (run by CI)
+├── out/
+│   └── smoke-report.md         # latest sweep (regenerated, never hand-edited)
 ├── .github/
 │   └── workflows/
 │       └── deploy-pages.yml    # Pages deploy: trunk + branch previews
@@ -87,7 +91,9 @@ The movement table is the actual content. To add a movement, add an entry to `MO
   load: { piernas: 0.45, empuje: 0.3, core: 0.25 } }
 ```
 
-Two things to get right: `load` shares should sum to about 1, and `cost` is calibrated so a hard minute of work is roughly 20 units. Both are read silently by the fault checker, so a wrong value shows up as skewed workouts rather than an error. Run `npm run lint` and check the axis bars in the interface after any data edit.
+Two things to get right: `load` shares should sum to about 1, and `cost` is calibrated so a hard minute of work is roughly 20 units. Both are read silently by the fault checker, so a wrong value shows up as skewed workouts rather than an error.
+
+Run `npm run smoke` before and after any change to the generator or the data, and read the diff in `out/smoke-report.md`. The output is random, so a workout that looks plausible proves nothing; the distributions do.
 
 See `CLAUDE.md` for the field reference and the known gotchas. Anything larger than a data edit, meaning a new control, mode, or screen, starts with the check in its Adding Features section: work out where the idea belongs and what it replaces before writing code.
 

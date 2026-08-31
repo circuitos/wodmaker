@@ -5,6 +5,7 @@ import { T } from "./i18n.js";
 import { generate, pick, sessionLoad } from "./generator.js";
 import { asText, headline } from "./text.js";
 import { platesFor } from "./plates.js";
+import { loadPref, savePref } from "./prefs.js";
 
 /* ------------------------------------------------------------------ *
  *  WOD GENERATOR
@@ -105,6 +106,11 @@ const CSS = `
 .meter{border-top:2px solid var(--ink);padding:16px 18px}
 .mhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
 .work{font-size:26px;font-weight:700}
+.mtoggle{margin-right:auto;margin-left:10px;border:0;background:transparent;padding:2px 4px;
+  font:inherit;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);
+  cursor:pointer;opacity:.65;border-bottom:1px solid var(--rule)}
+.mtoggle:hover{opacity:1;color:var(--ink)}
+.mtoggle:focus-visible{outline:2px solid var(--ink);outline-offset:2px;opacity:1}
 .axis{display:grid;grid-template-columns:104px 1fr 34px;align-items:center;gap:10px;margin-top:7px}
 .axis .an{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 .bar{height:7px;background:#EDECE6;border-radius:1px;overflow:hidden}
@@ -149,7 +155,8 @@ const IconSwap = () => (
 );
 
 export default function App() {
-  const [lang, setLang] = useState("es");
+  const [lang, setLang] = useState(() => loadPref("lang", "es"));
+  const [meterOpen, setMeterOpen] = useState(() => loadPref("meterOpen", true));
   const [env, setEnv] = useState("gym");
   const [strengthId, setStrengthId] = useState("none");
   const [wod, setWod] = useState(null);
@@ -158,6 +165,9 @@ export default function App() {
   const [calOpen, setCalOpen] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("09:45");
+
+  useEffect(() => { savePref("lang", lang); }, [lang]);
+  useEffect(() => { savePref("meterOpen", meterOpen); }, [meterOpen]);
   const t = T[lang];
 
   const roll = (keepLocks = false) => {
@@ -313,9 +323,13 @@ export default function App() {
               <div className="meter">
                 <div className="mhead">
                   <span className="lbl" style={{ margin: 0 }}>{t.load}</span>
+                  <button className="mtoggle disp" onClick={() => setMeterOpen(!meterOpen)}
+                    aria-expanded={meterOpen} aria-controls="plate-meter">
+                    {meterOpen ? t.hideMeter : t.showMeter}
+                  </button>
                   <span className="work mono disp">{dayWork}</span>
                 </div>
-                <Barbell work={dayWork} />
+                <div id="plate-meter" hidden={!meterOpen}><Barbell work={dayWork} /></div>
                 <p className="lbl" style={{ marginTop: 14 }}>{t.axes}</p>
                 {AXES.map((a) => {
                   const s = shares[a] || 0;
