@@ -6,7 +6,7 @@ import { sessionLoad } from "./generator.js";
 import { WEEK_COUNTS, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, weekCount, weekSummary }
   from "./planner.js";
 import { loadPref, savePref } from "./prefs.js";
-import { asText, headline, repLine, strengthLine } from "./text.js";
+import { asText, headline, repParts, strengthLine } from "./text.js";
 
 function cueFor(wod, lang) {
   const cues = CUES[lang][wod.fmt.id];
@@ -185,13 +185,20 @@ export default function WeekPlanner({ lang, oneRM, customRows }) {
                     : t.intensity[wod.plan.intensity]}</span>
                 </div>
                 <ol>
-                  {wod.items.map((item, itemIndex) => (
+                  {wod.items.map((item, itemIndex) => {
+                    const part = repParts(item, lang, wod.plan.env, wod.fmt);
+                    return (
                     <li key={item.move.id}>
                       {wod.fmt.id === "emom" && <span className="mono">Min {itemIndex + 1}</span>}
-                      <strong className="mono">{wod.fmt.id === "ladder" ? "10-2" : repLine(item, lang, wod.plan.env).split(" ")[0]}</strong>
-                      <span>{wod.fmt.id === "ladder" ? item.move[lang] : repLine(item, lang, wod.plan.env).split(" ").slice(1).join(" ")}</span>
+                      <strong className="mono">{part.dose}</strong>
+                      <span>
+                        {part.name}
+                        {part.side && <em> · {part.side}</em>}
+                        {part.kg && <em> · {part.kg}</em>}
+                      </span>
                     </li>
-                  ))}
+                    );
+                  })}
                   {wod.fmt.id === "emom" && wod.items.length === 3 && (
                     <li>
                       <span className="mono">Min 4</span>

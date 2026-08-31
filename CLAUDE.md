@@ -99,6 +99,7 @@ node scripts/build-preview-site.mjs /tmp/site   # read-only: compose the full Pa
 - **`env` gates availability.** A movement missing `casa` is unreachable at home, and a home session that ends up with almost no pulling raises the soft `nopull` warning instead of failing. Adding home-friendly pulling means adding a movement, not tuning the scorer.
 - **`generate()` degrades rather than fails.** It tries 300 candidates and returns the least-faulty one if none is clean, so a bad data edit shows up as workouts that always carry warnings, not as an exception.
 - **Every `localStorage` access has to stay guarded.** `src/prefs.js` wraps it because the accessor itself throws in private windows and where site data is blocked, not just returns null. A preference that cannot be saved is not an error worth surfacing: the app works, it just forgets. Do not reach for `localStorage` directly elsewhere.
+- **A movement row is described once, by `repParts()`.** It returns the dose, name, side and weight as separate values; `repLine()` joins them for the text export and both cards place them in their own columns. The week card used to recover the dose by splitting the rendered string on its first space, which works only while no dose contains one. A ladder's dose comes from `fmt.scheme`, not a literal.
 - **UI copy lives in `T`, keyed by language.** Both `es` and `en` have to be updated together; a missing key renders as `undefined` in the interface.
 
 ## Doc Upkeep

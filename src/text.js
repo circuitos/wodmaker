@@ -2,14 +2,30 @@ import { T } from "./i18n.js";
 import { liftById, moveById, pctFor } from "./lifts.js";
 /* =========================== TEXT RENDERING =========================== */
 
-export function repLine(it, lang, env) {
+/* One movement row, split into the parts a card lays out in its own columns:
+   the dose, the name, and the two qualifiers. The plain-text export joins them
+   with spaces and parentheses, the cards put them in separate elements with
+   their own separators, and all three read the same facts from here. Deriving
+   the parts from the rendered string instead is how "8 ring rows" and
+   "8/lado zancadas" start disagreeing about where the dose ends.
+
+   `fmt` is optional and only matters for a ladder, whose dose is the scheme
+   in the headline rather than a per-movement rep count. */
+export function repParts(it, lang, env, fmt = null) {
   const m = it.move;
-  const name = m[lang];
-  const kg = env === "gym" && m.kg ? ` (${m.kg})` : "";
-  const side = m.side ? ` ${T[lang].side}` : "";
-  if (m.unit === "s") return `${it.reps}" ${name}${side}${kg}`;
-  if (m.unit === "m" || m.unit === "cal") return `${it.reps} ${name}${side}${kg}`;
-  return `${it.reps} ${name}${side}${kg}`;
+  const scheme = fmt?.scheme;
+  return {
+    dose: scheme ? `${scheme[0]}-${scheme[scheme.length - 1]}`
+      : m.unit === "s" ? `${it.reps}"` : `${it.reps}`,
+    name: m[lang],
+    side: m.side ? T[lang].side : null,
+    kg: env === "gym" && m.kg ? m.kg : null,
+  };
+}
+
+export function repLine(it, lang, env) {
+  const { dose, name, side, kg } = repParts(it, lang, env);
+  return `${dose} ${name}${side ? ` ${side}` : ""}${kg ? ` (${kg})` : ""}`;
 }
 
 /* One line for one row of the strength block, main lift or accessory, in

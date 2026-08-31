@@ -4,7 +4,7 @@ import { CUES, INTENSITY, STRENGTH, intensityK } from "./formats.js";
 import { ACCESSORY, LIFTS, PRESET_ROWS, arrivingFromLifts, moveById, pctFor } from "./lifts.js";
 import { T } from "./i18n.js";
 import { generate, pick, sessionLoad } from "./generator.js";
-import { asText, headline, strengthLine } from "./text.js";
+import { asText, headline, repParts, strengthLine } from "./text.js";
 import { platesFor } from "./plates.js";
 import { loadPref, savePref } from "./prefs.js";
 import { CORPUS_DEFAULTS } from "./corpus.js";
@@ -545,17 +545,16 @@ export default function App() {
               </div>
 
               <div className="rows">
-                {wod.items.map((it, i) => (
+                {wod.items.map((it, i) => {
+                  const part = repParts(it, lang, env, wod.fmt);
+                  return (
                   <div className="row" key={it.move.id}>
                     {wod.fmt.id === "emom" && <span className="minute mono disp">Min {i + 1}</span>}
-                    <span className="reps mono">
-                      {wod.fmt.id === "ladder" ? "10-2"
-                        : it.move.unit === "s" ? `${it.reps}"` : it.reps}
-                    </span>
+                    <span className="reps mono">{part.dose}</span>
                     <span className="nm">
-                      {it.move[lang]}
-                      {it.move.side && <em> · {t.side}</em>}
-                      {env === "gym" && it.move.kg && <em> · {it.move.kg}</em>}
+                      {part.name}
+                      {part.side && <em> · {part.side}</em>}
+                      {part.kg && <em> · {part.kg}</em>}
                     </span>
                     <button className="ico" title={t.swap} onClick={() => swapOne(it.move.id)}><IconSwap /></button>
                     <button className="ico" title={t.lock} aria-pressed={!!locks[it.move.id]}
@@ -563,7 +562,8 @@ export default function App() {
                       <IconLock on={!!locks[it.move.id]} />
                     </button>
                   </div>
-                ))}
+                  );
+                })}
                 {wod.fmt.id === "emom" && wod.items.length === 3 && (
                   <div className="row"><span className="minute mono disp">Min 4</span>
                     <span className="reps mono">·</span><span className="nm">{t.rest}</span></div>
