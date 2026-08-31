@@ -136,6 +136,8 @@ const CSS = `
 .row:hover{background:#FAFAF7}
 .minute{font-size:10px;letter-spacing:.1em;color:var(--ink-2);width:40px;flex:0 0 40px}
 .reps{font-size:19px;font-weight:600;min-width:52px;flex:0 0 auto}
+/* A ladder prints every rung, so the dose can be much longer than a rep count. */
+.reps.long{font-size:13px;letter-spacing:-.01em;min-width:0}
 .nm{font-size:15px;line-height:1.25;flex:1 1 auto}
 .nm em{font-style:normal;color:var(--ink-2);font-size:12.5px}
 .ico{border:0;background:transparent;cursor:pointer;padding:6px;border-radius:2px;
@@ -217,8 +219,9 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
 .day-strength ul{list-style:none;padding:0;margin:0;color:var(--ink-2);font-size:11.5px}.day-strength li::before{content:'· '}
 .day-wod-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 14px 7px}
 .day-wod-head h3{font-size:23px;margin:0}.day-wod-head span{font-size:9.5px;text-transform:uppercase;color:var(--ink-2)}
-.day-wod ol{list-style:none;padding:0 14px;margin:0}.day-wod li{display:grid;grid-template-columns:auto auto 1fr;gap:8px;
+.day-wod ol{list-style:none;padding:0 14px;margin:0}.day-wod li{display:grid;grid-template-columns:auto minmax(0,auto) 1fr;gap:8px;
   align-items:baseline;padding:6px 0;border-top:1px solid #EFEEE9;font-size:12.5px}.day-wod li>span:first-child{font-size:9px;color:var(--ink-2)}
+.day-wod li>strong{overflow-wrap:anywhere}
 .day-wod .cue{padding:8px 14px 12px;margin:0;font-size:11.5px}
 .day-foot{display:flex;gap:10px;flex-wrap:wrap;padding:8px 14px;background:#FAFAF7;border-top:1px solid var(--rule);
   color:var(--ink-2);font-size:10.5px}.day-foot b{color:var(--ink)}
@@ -590,7 +593,7 @@ export default function App() {
                   return (
                   <div className="row" key={it.move.id}>
                     {wod.fmt.id === "emom" && <span className="minute mono disp">Min {i + 1}</span>}
-                    <span className="reps mono">{part.dose}</span>
+                    <span className={part.dose.length > 8 ? "reps mono long" : "reps mono"}>{part.dose}</span>
                     <span className="nm">
                       {part.name}
                       {part.side && <em> · {part.side}</em>}

@@ -3,6 +3,7 @@ import { daySeed, defaultWeekConfig, editWeekDay, normaliseWeek, planWeek, prese
   from "../src/planner.js";
 import { sessionLoad } from "../src/generator.js";
 import { FORMATS } from "../src/formats.js";
+import { ladderRungs } from "../src/text.js";
 
 const shape = (plan) => plan.map((wod) => ({
   format: wod.fmt.id,
@@ -130,4 +131,28 @@ for (let seed = 1; seed <= 40; seed += 1) {
 }
 assert(swapsTested > 100, "the swap sweep should cover a useful number of slots");
 
-console.log(`Planner check passed for deterministic 2, 3, 4, and 5-day weeks (${swapsTested} swaps).`);
+/* A ladder prints descending rungs derived from each movement's own reps, and
+   what it prints has to be the work it charges for. The format's scheme is a
+   shape: `reps` is the top rung and the ladder costs `reps * passes`. Printing
+   the literal 10-8-6-4-2 made a ladder report loads its own card could not
+   explain, which is how this was found. */
+let laddersChecked = 0;
+for (let seed = 1; seed <= 400; seed += 1) {
+  const week = normaliseWeek([{ weekday: 1, env: "gym", intensity: "auto", rows: [] }], 1);
+  const [wod] = planWeek(week, { seed });
+  if (!wod || wod.fmt.id !== "ladder") continue;
+  laddersChecked += 1;
+  for (const item of wod.items) {
+    const rungs = ladderRungs(item, wod.fmt);
+    assert.equal(rungs.length, wod.fmt.scheme.length, "one rung per step of the scheme");
+    assert.equal(rungs[0], Math.max(1, item.reps), "the top rung is the movement's dose");
+    for (let i = 1; i < rungs.length; i += 1) assert(rungs[i] <= rungs[i - 1], "rungs descend");
+    const printed = rungs.reduce((sum, rung) => sum + rung, 0);
+    const charged = item.reps * wod.fmt.passes(wod);
+    assert(Math.abs(printed - charged) <= 3,
+      `a ladder must charge for what it prints (${printed} printed vs ${charged} charged)`);
+  }
+}
+assert(laddersChecked > 20, "the ladder sweep should see a useful number of ladders");
+
+console.log(`Planner check passed for deterministic 2, 3, 4, and 5-day weeks (${swapsTested} swaps, ${laddersChecked} ladders).`);

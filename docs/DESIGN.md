@@ -437,3 +437,25 @@ Editing a day re-sorts the week, because calendar order is what the carry-over m
 A workout with no week around it no longer exists. Every session belongs to a day, and "Another" redraws that day rather than handing you an anonymous new workout. That is a real loss for someone who only wanted a one-off, and it is the price of the two views agreeing.
 
 Editing one day also changes the days after it. Their reps move because their `arriving` includes the edited day's carry, and their movements can move because they exclude the previous day's. Earlier days never move. This is the diversity and carry-over model doing what it says rather than a leak, and `npm run check:planner` pins the direction: redrawing day two leaves day one untouched.
+
+## A ladder was printing one workout and charging for another
+
+Reported from use: adding `3x8 goblet squats` to a strength block moved the day's load from 310 down to 303, with the conditioning piece looking completely unchanged. Two separate things were stacked underneath it.
+
+**Auto effort is a trade, and that part is working.** `chooseSession()` picks whichever of soft, normal and hard lands the whole day closest to `TARGET_DAY_LOAD`. Strength and conditioning therefore compete for the same budget: about 34 points of accessory work pushed "hard" past the target, auto stepped down to "normal", and the conditioning fell further than the strength rose.
+
+```
+seed 36, ladder, identical movements
+  before:  effort hard    strength 193  conditioning 119  total 312
+  after:   effort normal  strength 224  conditioning  74  total 297
+```
+
+Measured over 1500 seeds with the same two strength rows: on `auto` the load drops in 297 of 1234 same-shape cases; at a fixed effort it drops in 0 of 1239 at soft, 8 of 1219 at normal, 19 of 1210 at hard. Those last few are quantisation, not the target: `row_m` steps 50 m at a time, which is 15.5 points across five passes, so two coarse movements stepping down together can outweigh the strength added. Both behaviours are the model doing what it says.
+
+**The ladder display was not.** `repParts()` printed the format's literal `10-8-6-4-2` for every movement, so the reps the generator had actually scaled were invisible. In the case above they went `10/25/6` to `6/15/4`, a 40% cut, with a byte-identical card. Across 927 generated ladder items the costed reps ranged from 4 to 450 and every one of them printed `10-2`.
+
+The model itself was already coherent. `passes: () => 3` is exact because the scheme sums to 30 against a top rung of 10, so `it.reps` is the top rung and the ladder costs `reps * 3`. Only the printing was wrong. `ladderRungs()` now scales the scheme by `reps / scheme[0]`, so a movement at 11 reps prints `11-9-7-4-2` and one at 450 m prints `450-360-270-180-90`, and the rungs sum to exactly what `sessionLoad()` charges. The headline dropped its global `10-8-6-4-2`, which was never true of more than one movement at a time.
+
+`npm run check:planner` pins the invariant that made this findable: printed rungs sum to `reps * passes`, within the rounding of five integers.
+
+Rounding does leave a tie at small doses (`4-3-2-2-1`). That is honest about a ladder the generator scaled down to almost nothing, where the old display claimed 30 reps and charged for 12, so it is left alone rather than smoothed into a nicer-looking lie.
