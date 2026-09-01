@@ -53,6 +53,46 @@
   --steel-collar: #3A3F47;
 }
 
+/* Cold, not warm: a neutral near-black with a slight blue lean, which is what
+   a gym board under strip lighting looks like at six in the morning. No sepia
+   and no parchment. The paper ramp inverts, so --surface is still the thing
+   you write on and --board is still the thing it sits on, one step darker.
+ *
+ * The four accents are lifted rather than muted. #C8102E goes muddy against
+ * near-black, and the plates and the axis bars have to read as one system, so
+ * all four move together to the bright, slightly cool end: signal red, azure,
+ * amber, mint. The bare change plate goes cool grey, since bone would now be
+ * the brightest thing in the drawing. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --board: #0E1114;
+  --surface: #171B20;
+  --panel: #1C2128;
+  --hover: #252C34;
+  --hair: #232930;
+  --track: #272E36;
+  --rule: #333B44;
+  --frame: #414A55;
+
+  --ink: #E7EBEF;
+  --ink-2: #9AA4AF;
+  --ink-max: #FFFFFF;
+
+  --shadow: rgba(0, 0, 0, .55);
+  --shadow-soft: rgba(0, 0, 0, .45);
+
+  --red: #FF4B5C;
+  --blue: #4D9BFF;
+  --yellow: #FFD23F;
+  --green: #2ED08A;
+
+  --plate-bare: #AEB8C2;
+  --plate-edge: #0B0E11;
+  --steel: #7A828C;
+  --steel-dark: #565E68;
+  --steel-collar: #454D57;
+}
+
 * {
   box-sizing: border-box;
 }

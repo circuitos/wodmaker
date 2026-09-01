@@ -2,7 +2,7 @@
 
 A CrossFit-style workout generator that builds a conditioning piece around the strength work you already did, and around the equipment you actually have. Pick a place (gym, park, home), say what you lifted first, and get a balanced WOD with real rep prescriptions.
 
-Bilingual: Spanish and English, toggled in the header.
+Bilingual: Spanish and English, toggled in the header. Light or dark, toggled next to it and remembered between visits.
 
 Built from the original training log, so the doses and formats look like workouts a coach would write rather than a random draw from a movement list. The source file is preserved under `data/`; it is named for 55 sessions but contains 56 timestamped entries.
 
@@ -69,7 +69,7 @@ wodmaker/
 │   ├── WeekPlanner.jsx         # the week overview
 │   ├── App.jsx                 # the week state, the day editor, the styles
 │   ├── main.jsx                # React root
-│   └── index.css               # global reset (app styles live in App.jsx)
+│   └── index.css               # the palette and the reset (app styles live in App.jsx)
 ├── public/
 │   ├── favicon.svg
 │   └── robots.txt              # keeps /previews/ out of search engines

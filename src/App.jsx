@@ -78,6 +78,18 @@ const CSS = `
 .top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
   border-bottom:2px solid var(--frame);padding-bottom:10px;margin-bottom:20px}
 .top>div:first-child{min-width:0}
+/* The theme switch and the language switch are one cluster: both are about
+   you rather than about a session, and the header is where the app already
+   keeps that kind of control. Stretching means the two boxes stay the same
+   height as the language toggle grows with its font. */
+.topctl{display:flex;align-items:stretch;gap:6px;flex:0 0 auto}
+.themetog{display:inline-flex;align-items:center;justify-content:center;padding:0 7px;
+  border:1px solid var(--frame);border-radius:2px;background:transparent;color:var(--ink);cursor:pointer}
+.themetog:hover{color:var(--red);border-color:var(--red)}
+.themetog svg{width:14px;height:14px;display:block}
+.themetog .sun{display:none}
+[data-theme="dark"] .themetog .sun{display:block}
+[data-theme="dark"] .themetog .moon{display:none}
 .lang{display:flex;border:1px solid var(--frame);border-radius:2px;overflow:hidden;flex:0 0 auto}
 .lang button{border:0;background:transparent;padding:5px 9px;font-size:11px;font-weight:600;
   letter-spacing:.08em;cursor:pointer;color:var(--ink)}
@@ -256,6 +268,19 @@ const IconLock = ({ on }) => (
     <path d={on ? "M8 11V7a4 4 0 0 1 8 0v4" : "M8 11V7a4 4 0 0 1 7.5-2"} />
   </svg>
 );
+/* Sun and moon are both rendered and CSS shows one, so the swap costs no
+   re-render and cannot get out of step with the stamped attribute. */
+const IconMoon = () => (
+  <svg className="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 12.5A9 9 0 1 1 11.5 3a7 7 0 0 0 9.5 9.5z" />
+  </svg>
+);
+const IconSun = () => (
+  <svg className="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" />
+  </svg>
+);
 const IconSwap = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" />
@@ -265,6 +290,10 @@ const IconSwap = () => (
 
 export default function App() {
   const [lang, setLang] = useState(() => loadPref("lang", "es"));
+  /* index.html stamps the saved theme before first paint; this keeps the
+     attribute and the preference in step from then on. The board is light by
+     default: dark is the thing you ask for. */
+  const [theme, setTheme] = useState(() => (loadPref("theme", "light") === "dark" ? "dark" : "light"));
   const [view, setView] = useState(() => (loadPref("view", "day") === "week" ? "week" : "day"));
   const [meterOpen, setMeterOpen] = useState(() => loadPref("meterOpen", true));
   /* A one-rep max is a fact about you rather than about a day, so it stays
@@ -290,6 +319,10 @@ export default function App() {
   const [time, setTime] = useState("09:45");
 
   useEffect(() => { savePref("lang", lang); }, [lang]);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    savePref("theme", theme);
+  }, [theme]);
   useEffect(() => { savePref("view", view); }, [view]);
   useEffect(() => { savePref("meterOpen", meterOpen); }, [meterOpen]);
   useEffect(() => { savePref("oneRM", oneRM); }, [oneRM]);
@@ -500,10 +533,19 @@ export default function App() {
             <h1 className="h1 disp">{t.title}</h1>
             <div className="sub disp">{t.sub}</div>
           </div>
-          <div className="lang">
-            {["es", "en"].map((l) => (
-              <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>
-            ))}
+          {/* The two things that are about you rather than about a session
+              sit together, in the one control cluster the header already has. */}
+          <div className="topctl">
+            <button className="themetog" type="button" aria-pressed={theme === "dark"}
+              aria-label={t.dark} title={t.dark}
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+              <IconMoon /><IconSun />
+            </button>
+            <div className="lang">
+              {["es", "en"].map((l) => (
+                <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>
+              ))}
+            </div>
           </div>
         </header>
 

@@ -644,3 +644,85 @@ The review checked all 56 entries against the log and found no missed movements,
 ### Numbers, again
 
 The evidenced share of a gym block is 87%, not the 88% published. The session-load medians moved with the budget re-tune and are now 415, 340 and 308. The review also made the fair point that the committed check asserts only a 120-point band, so it does not pin those figures; they are measurements quoted in prose, and the check is a guard against drift rather than a proof of them.
+
+## A dark theme, and the tokens it needed first
+
+The mechanism is borrowed from `circuitos/inn-menu-simulator`, which is a
+different-looking app with the same problem: custom properties on `:root`
+redefined under `[data-theme="dark"]`, `color-scheme` in each so native
+controls follow, a blocking boot script that stamps the attribute before first
+paint, and a toggle whose two icons are swapped by CSS rather than by state.
+None of its stylization came across. That app is a book; this one is a flat
+newsprint board and stays one.
+
+### The groundwork was most of the work
+
+The CSS template string in `App.jsx` had 8 tokens and 33 literal colours,
+about 20 of them outside the token set. A theme cannot reach a literal, so a
+`[data-theme="dark"]` block written on top of that would have left white cards
+on a black board, white hairlines between rows, and a barbell drawn in four
+hexes nobody could redefine. The tokenisation landed first, on its own, and was
+checked the only way a no-op can be checked: 20 full-page screenshots across
+five widths, two languages and both views, byte-identical before and after.
+
+Two of the tokens are new distinctions rather than renames.
+
+`--frame` splits borders that enclose from `--ink`, which is text and fills.
+They are the same colour in the light theme, and the split looks like
+bookkeeping until you write the dark values: a 2px near-white box around every
+card reads as a mistake, while near-black around every card is the entire
+newsprint look. One colour could not do both jobs.
+
+`--ink-max` is ink pushed all the way, which is what `.btn.pri:hover` meant
+when it said `#000`. In the dark theme the primary button is already
+near-white, so its hover has to go to `#fff`; the literal would have gone the
+wrong way.
+
+The plate colours moved out of `plates.js` as `var()` references. The only
+consumer is the inline `<svg>`, which resolves them from the document like any
+other rule, so the plates follow the theme without `plates.js` knowing there is
+one.
+
+### Cold, and the accents move together
+
+Near-black with a slight blue lean. No sepia and no parchment: the reference's
+dark palette was an anchor for character, not for hexes.
+
+The four accents could not be carried over. `#C8102E` goes muddy against
+near-black, and once one moves they all have to, because the plates and the
+axis bars are the same four colours and have to read as one system rather than
+two palettes that disagree. They go bright and slightly cool together: signal
+red `#FF4B5C`, azure `#4D9BFF`, amber `#FFD23F`, mint `#2ED08A`. The bare
+change plate goes cool grey, since bone would otherwise be the brightest thing
+in the drawing.
+
+The hard 5px offset shadow survives as a slightly-darker-than-board block. It
+is subtle, because the board is already near-black and there is not much room
+below it, and the `--frame` border carries most of the separation instead.
+
+### The toggle sits in the header, not over the page
+
+The reference floats a fixed round button and repositions it under a mobile
+breakpoint, because it has no header to put one in. This app does: the
+language switch already lives at the top right, and the theme is the same kind
+of choice, about you rather than about a session. So the two share a cluster
+and the fixed positioning was dropped along with the stylization. Nothing
+floats over the card, and there is no breakpoint to maintain.
+
+### Persistence, and the one exception to prefs.js
+
+The saved theme goes through `prefs.js` like every other preference. The boot
+script in `index.html` cannot: it runs before the bundle, which is the whole
+point of it. It reads the same key, in the same shape, behind the same
+try/catch, and does nothing at all if the value is neither `"dark"` nor
+`"light"`. Verified with `localStorage` rigged to throw on access and with junk
+saved under the key: the page renders, the toggle still works for the session,
+and nothing reaches the console.
+
+The tokens live in `src/index.css` rather than in the template string in
+`App.jsx`, and that is what makes the boot script worth having. Vite emits that
+file as a `<link>` in `<head>`, so the ground colour is painted before the
+bundle runs. Tokens shipped inside the bundle would arrive a frame late and a
+dark session would open on a flash of white.
+
+Light is the default. A visitor with no saved choice gets the board.

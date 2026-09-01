@@ -1,6 +1,6 @@
 export const T = {
   es: {
-    title: "Generador de WOD", sub: "A partir del registro original",
+    title: "Generador de WOD", sub: "A partir del registro original", dark: "Modo oscuro",
     where: "Dónde entrenas", effort: "Cuánto aprietas",
     intensity: { soft: "suave", normal: "normal", hard: "duro" }, gym: "Gimnasio", parque: "Parque", casa: "Casa",
     whereHint: { gym: "Todo el material", parque: "Barra de dominadas, banco, suelo", casa: "Sin material" },
@@ -37,7 +37,7 @@ export const T = {
     },
   },
   en: {
-    title: "WOD Generator", sub: "Built from the original training log",
+    title: "WOD Generator", sub: "Built from the original training log", dark: "Dark mode",
     where: "Where you train", effort: "How hard",
     intensity: { soft: "soft", normal: "normal", hard: "hard" }, gym: "Gym", parque: "Park", casa: "Home",
     whereHint: { gym: "Full equipment", parque: "Pull-up bar, bench, ground", casa: "No equipment" },

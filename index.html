@@ -7,6 +7,21 @@
     <meta name="description" content="CrossFit-style workout generator. Pick where you train and what you lifted first, get a balanced WOD with real rep prescriptions. Spanish and English." />
     <link rel="canonical" href="https://circuitos.github.io/wodmaker/" />
     <title>WOD Generator</title>
+    <!-- Stamp the saved theme before anything paints, so a dark session does
+         not open on a white flash. This is the one place that touches
+         localStorage directly: src/prefs.js owns every other access, and it
+         has not loaded yet. Same key, same shape, and the same guard, because
+         reading localStorage throws outright in a private window. -->
+    <script>
+      (function () {
+        try {
+          var p = JSON.parse(localStorage.getItem("wodmaker.prefs") || "{}");
+          if (p.theme === "dark" || p.theme === "light") {
+            document.documentElement.setAttribute("data-theme", p.theme);
+          }
+        } catch (e) { /* no saved theme is not an error */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
