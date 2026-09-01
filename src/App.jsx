@@ -32,7 +32,7 @@ import WeekPlanner from "./WeekPlanner.jsx";
 /* ---------- the plate meter drawing ---------- */
 function Barbell({ work }) {
   const plates = platesFor(work);
-  const W = 320, H = 116, mid = H / 2;
+  const W = 320, H = 82, mid = H / 2;
   const sleeve = 96;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} aria-hidden="true">
