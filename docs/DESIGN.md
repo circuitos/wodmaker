@@ -726,3 +726,95 @@ bundle runs. Tokens shipped inside the bundle would arrive a frame late and a
 dark session would open on a flash of white.
 
 Light is the default. A visitor with no saved choice gets the board.
+
+## A style pass on the card, and one drawing for two views
+
+Three changes, from a design pass run against the app rather than against a
+description of it. The pass came back as a prototype plus a written handoff;
+what follows is what the handoff asked for, what the code turned out to say
+instead, and where the two had to be reconciled.
+
+### The dose leads
+
+A rep line was a 19px mono dose against a 15px name, which is nearly the same
+weight, so neither led. That is fine on a desk and weak in the place the app
+is actually used: phone propped on the floor, three steps away, mid-round. The
+dose now takes the display face at 30px against a 17px name.
+
+It costs about 4px of row height, which is the whole reason the stacked
+variant lost: a 34px dose over the name is more legible still, but four
+movements and the meter stop fitting one phone screen. Keeping the row on one
+line also keeps the swap and lock buttons where they were.
+
+A ladder is the case that breaks it. `100-80-60-40-20` is fifteen characters,
+and at 30px it is a paragraph. It keeps one line at 15px instead and the
+movement name takes the wrap, which is the same rule the old 12px mono
+treatment followed.
+
+### Six bars became one band
+
+The effort split was six rows of label, track and percentage, about 150px of a
+phone screen spent on a number nobody acts on between rounds. It is now a
+single 10px band: the three axes carrying most of the session, then the
+remainder, with a caption naming the peaks. The measured saving is 95px on the
+meter at 390px.
+
+Red still leads the band, and it now means "biggest" rather than "dangerous".
+That trade is only payable because the warning callout underneath is
+untouched: it fires off `wod.faults` exactly as before, and it is the half of
+the pair anyone acts on. The band shows the shape, the warning says what to do.
+
+The third axis drops out below 380px. That was measured rather than guessed:
+across 28 sampled days in both languages the caption wrapped to two lines on
+19 of them at 320px, 9 at 360 and 1 at 390. Spanish is the binding case,
+because `cadena posterior` is fourteen characters where English has `pull`.
+
+### One session, three blocks, drawn once
+
+The Day card listed the strength block as bulleted grey text; the week card
+listed the same rows again under its own treatment. Two drawings of one fact,
+which is the failure mode this codebase already paid for once with the volume
+target. Both now render from `src/Blocks.jsx`.
+
+The number is what does the work. `01 · Levantamientos`, `02 · Accesorio`,
+`03 · Condicionamiento`: small caps alone left the middle block reading as a
+continuation of the first, and a numeral does not. The numbering runs over the
+blocks actually shown rather than over the canonical three, so a park day with
+no barbell work opens at `01 · Accesorio` instead of printing an `02` with
+nothing above it.
+
+Two things fell out of adopting it. The week card's foot printed
+`condicionamiento: 163` beside a block header already saying 163, so the foot
+now keeps only the carried fatigue, which is the one figure the headers do not
+say. And `strengthParts()` had to exist first: the cards want the movement to
+lead with the prescription beside it, the text export wants one string with
+the dose in front, and recovering either from the other means splitting a
+rendered string, which is a bug this repo has already had.
+
+### Where the handoff and the code disagreed
+
+The handoff described the show/hide toggle as belonging to the effort split,
+and reasoned that one 10px band leaves nothing worth collapsing. In the code
+that toggle hid the barbell plate drawing, which is the tallest thing in the
+meter and is untouched by the band. The instruction was followed as written,
+because the outcome still holds: the meter is 95px shorter overall, the
+default was "shown" so nobody's default changes, and one control and one saved
+preference are gone. But the stated reason was not the real one.
+
+The handoff also put the day's total in the split's own header. In its
+isolated prototype card that was the only total on screen; in the real meter
+`Carga del día` already carries it two rows above, so the split header keeps
+the label alone rather than printing 345 twice.
+
+### What it cost
+
+The Day card came out 11px shorter at 390px: the meter gave back 95px and the
+taller rep lines and block headers spent most of it. That is the trade the
+pass intended.
+
+The week card grew 180px, from 508 to 688, because the 30px dose applies there
+too. Over a five-day week that is nine hundred pixels of extra scrolling in
+the view whose job is showing the shape of a week at a glance. The handoff
+asked for the shared rep line in both views and it is implemented that way;
+the number is recorded here because it is the one figure in this pass that
+argues against its own design.

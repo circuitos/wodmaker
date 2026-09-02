@@ -2,12 +2,14 @@ import React, { useState, useMemo, useEffect } from "react";
 import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, STRENGTH, cueFor } from "./formats.js";
 import {
-  accessoriesFor, accessoryRepMax, defaultAccessoryRow, liftsFor, moveById, pctFor, splitRows,
+  accessoriesFor, accessoryRepMax, blockLoads, defaultAccessoryRow, liftsFor, moveById, pctFor,
+  splitRows,
 } from "./lifts.js";
 import { T } from "./i18n.js";
 import { sessionLoad } from "./generator.js";
-import { asText, headline, repParts, strengthLine } from "./text.js";
+import { asText, headline, repParts } from "./text.js";
 import { platesFor } from "./plates.js";
+import { BlockHead, BlockRows, RepLine } from "./Blocks.jsx";
 import { loadPref, savePref } from "./prefs.js";
 import {
   changeEnv, daySeed, defaultWeekConfig, editWeekDay, normaliseOneRM, normaliseWeek, planWeek,
@@ -153,43 +155,62 @@ const CSS = `
   display:flex;align-items:baseline;justify-content:space-between;gap:4px 10px;flex-wrap:wrap}
 .fmt{font-size:clamp(24px,7vw,32px);font-weight:700;min-width:0;overflow-wrap:anywhere}
 .tag{font-size:10.5px;letter-spacing:.14em;color:var(--ink-2);text-transform:uppercase;white-space:nowrap}
-.rows{padding:6px 8px 10px}
-.row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:2px}
-.row+.row{border-top:1px solid var(--hair)}
-.row:hover{background:var(--panel)}
-.minute{font-size:10px;letter-spacing:.1em;color:var(--ink-2);width:40px;flex:0 0 40px}
-.reps{font-size:19px;font-weight:600;min-width:52px;flex:0 0 auto}
-/* A ladder prints every rung, so the dose can be much longer than a rep count. */
-/* A ladder prints every rung, so the dose can be much longer than a rep
-   count. It is the number you train off, so it keeps one line and the
-   movement name takes the wrap instead. */
-.reps.long{font-size:12px;letter-spacing:-.02em;white-space:nowrap}
-.nm{font-size:15px;line-height:1.25;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
-.nm em{font-style:normal;color:var(--ink-2);font-size:12.5px}
+.rows{padding:2px 8px 10px}
+/* The dose leads the row. At 19px against a 15px name neither did, which is
+   fine on a desk and weak with the phone on the floor three steps away. The
+   number takes the display face it already uses in the headline, and the row
+   stays one line so the swap and lock buttons can sit on it. */
+.rep{display:flex;align-items:baseline;gap:12px;padding:11px 10px;border-top:1px solid var(--hair);
+  border-radius:2px}
+.rep:hover{background:var(--panel)}
+.rep-min{font-size:10px;letter-spacing:.1em;color:var(--ink-2);width:40px;flex:0 0 40px}
+.rep-dose{font-size:30px;font-weight:700;line-height:.9;min-width:48px;flex:0 0 auto}
+/* A ladder prints every rung, so the dose can run to fifteen characters. It
+   is still the number you train off, so it keeps one line at a size that
+   fits and the movement name takes the wrap instead. */
+.rep-dose.long{font-size:15px;letter-spacing:0;white-space:nowrap;min-width:0}
+.rep-nm{font-size:17px;line-height:1.15;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.rep-nm em{font-style:normal;color:var(--ink-2);font-size:13px}
+.rep .ico{align-self:center}
 .ico{border:0;background:transparent;cursor:pointer;padding:6px;border-radius:2px;
   color:var(--ink-2);opacity:.55;line-height:0}
 .ico:hover{opacity:1;background:var(--hover)}
 .ico[aria-pressed="true"]{opacity:1;color:var(--red)}
 .cue{padding:0 18px 16px;font-size:13px;color:var(--ink-2);font-style:italic}
-.prev{padding:14px 18px 12px;border-bottom:2px solid var(--frame);background:var(--panel)}
-.prevblock+.prevblock{margin-top:8px}
-.prevlist{list-style:none;margin:0;padding:0;font-size:13px;color:var(--ink-2)}
-.prevlist li{padding:2px 0}
-.prevlist li::before{content:"· ";color:var(--ink-2)}
+/* One block header, both views. The number is what stops block two reading
+   as part of block one, which the small caps were carrying alone. */
+.blk{display:flex;align-items:baseline;justify-content:space-between;gap:4px 10px;
+  padding:8px 12px;background:var(--panel);border-bottom:2px solid var(--frame)}
+.blk-mid{border-top:1px solid var(--rule)}
+.blk-n{font-size:13px;font-weight:700;letter-spacing:.1em;min-width:0;overflow-wrap:anywhere}
+.blk-load{font-size:11px;color:var(--ink-2);white-space:nowrap}
+.blk-row{margin:0;padding:8px 12px;font-size:13px}
+.blk-row+.blk-row{border-top:1px solid var(--hair)}
+.blk-rx{color:var(--ink-2);font-size:12px;white-space:nowrap}
 .meter{border-top:2px solid var(--frame);padding:16px 18px}
 .mhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
 .work{font-size:26px;font-weight:700}
-.mtoggle{margin-right:auto;margin-left:10px;border:0;background:transparent;padding:2px 4px;
+/* The "clear the grid" link. It used to share this class with a show/hide
+   toggle on the plate meter, which the one-band split retired. */
+.mtoggle{border:0;background:transparent;padding:2px 4px;
   font:inherit;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);
   cursor:pointer;opacity:.65;border-bottom:1px solid var(--rule)}
 .mtoggle:hover{opacity:1;color:var(--ink)}
 .mtoggle:focus-visible{outline:2px solid var(--ink);outline-offset:2px;opacity:1}
-.axis{display:grid;grid-template-columns:104px 1fr 34px;align-items:center;gap:10px;margin-top:7px}
-.axis .an{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+/* Six labelled bars was 150 pixels of a phone spent on a number nobody acts
+   on mid-session. One band keeps the split, the caption keeps the names, and
+   the warning below keeps the actionable half. */
+.split{margin-top:14px}
+.split-band{display:flex;height:10px;margin:8px 0 6px;background:var(--track);border-radius:1px;
+  overflow:hidden}
+.split-band i{display:block;height:100%}
+.split-band i.s1{background:var(--red)}
+.split-band i.s2{background:var(--ink)}
+.split-band i.s3{background:var(--ink-2)}
+.split-cap{margin:0;font-size:12px;line-height:1.4}
+.split-cap strong{font-weight:600}
 .bar{height:7px;background:var(--track);border-radius:1px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--ink)}
-.bar i.hot{background:var(--red)}
-.pct{font-size:11px;color:var(--ink-2);text-align:right}
 .warn{margin:14px 18px 0;border-left:3px solid var(--yellow);padding:8px 0 8px 11px;
   font-size:12.5px;color:var(--ink-2);line-height:1.45}
 /* The actions sit at the top of the card: they are the most-used part of
@@ -245,16 +266,20 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{
 .day-config{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--rule)}
 .day-config label>span{display:block;margin-bottom:3px;font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)}
 .day-config select{width:100%;min-width:0;padding:6px 5px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);font:inherit;font-size:11px}
-.day-strength{padding:7px 14px;border-bottom:1px dashed var(--rule)}.day-strength .grp{margin:0 0 3px}
-.day-strength ul{list-style:none;padding:0;margin:0;color:var(--ink-2);font-size:11.5px}.day-strength li::before{content:'· '}
-.day-wod-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 14px 7px}
+/* The week card draws its blocks with the same .blk and .rep the day card
+   uses; what is left here is only what differs, which is the padding a
+   narrower card wants. */
+.day-card .blk,.day-card .blk-row{padding-left:14px;padding-right:14px}
+.day-wod-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 14px 4px}
 .day-wod-head h3{font-size:23px;margin:0}.day-wod-head span{font-size:9.5px;text-transform:uppercase;color:var(--ink-2)}
-.day-wod ol{list-style:none;padding:0 14px;margin:0}.day-wod li{display:grid;grid-template-columns:auto minmax(0,auto) 1fr;gap:8px;
-  align-items:baseline;padding:6px 0;border-top:1px solid var(--hair);font-size:12.5px}.day-wod li>span:first-child{font-size:9px;color:var(--ink-2)}
-.day-wod li>strong{overflow-wrap:anywhere}
+.day-card .rows{padding:0 6px 6px}
 .day-wod .cue{padding:8px 14px 12px;margin:0;font-size:11.5px}
 .day-foot{display:flex;gap:10px;flex-wrap:wrap;padding:8px 14px;background:var(--panel);border-top:1px solid var(--rule);
   color:var(--ink-2);font-size:10.5px}.day-foot b{color:var(--ink)}
+/* Measured over 28 days in both languages: the third axis wraps the caption
+   on 19 of them at 320px and 9 at 360, and on 1 at 390. Below 380 it goes,
+   which is the handoff's own answer to it. Its separator travels with it. */
+@media(max-width:380px){.split-3{display:none}}
 @media(max-width:620px){.week-intro,.week-controls{align-items:stretch;flex-direction:column}.week-actions{width:100%}
   .week-actions .btn{flex:1;justify-content:center}.week-balance{grid-template-columns:1fr}.day-config{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:no-preference){
@@ -295,7 +320,6 @@ export default function App() {
      default: dark is the thing you ask for. */
   const [theme, setTheme] = useState(() => (loadPref("theme", "light") === "dark" ? "dark" : "light"));
   const [view, setView] = useState(() => (loadPref("view", "day") === "week" ? "week" : "day"));
-  const [meterOpen, setMeterOpen] = useState(() => loadPref("meterOpen", true));
   /* A one-rep max is a fact about you rather than about a day, so it stays
      here while everything else about a session lives on the day it belongs
      to. */
@@ -324,7 +348,6 @@ export default function App() {
     savePref("theme", theme);
   }, [theme]);
   useEffect(() => { savePref("view", view); }, [view]);
-  useEffect(() => { savePref("meterOpen", meterOpen); }, [meterOpen]);
   useEffect(() => { savePref("oneRM", oneRM); }, [oneRM]);
   useEffect(() => { savePref("weekCount", count); }, [count]);
   useEffect(() => { savePref("weekConfigs", configs); }, [configs]);
@@ -457,6 +480,20 @@ export default function App() {
   }, [wod]);
 
   const dayWork = useMemo(() => (wod ? Math.round(sessionLoad(wod).total) : 0), [wod]);
+  /* The band is the three axes carrying most of the session plus whatever is
+     left, which is the whole split in one row rather than six. */
+  const split = useMemo(() => {
+    const ranked = AXES.map((a) => ({ a, s: shares[a] || 0 })).sort((x, y) => y.s - x.s);
+    const top = ranked.slice(0, 3).filter((x) => x.s > 0);
+    return { top, rest: Math.max(0, 1 - top.reduce((sum, x) => sum + x.s, 0)) };
+  }, [shares]);
+  const blocks = useMemo(
+    () => blockLoads(wod ? wod.strengthRows : [], oneRM), [wod, oneRM],
+  );
+  /* The band is a picture of the caption below it, so it reads out as the
+     same sentence rather than as six unlabelled boxes. */
+  const splitLabel = useMemo(() => split.top
+    .map((x) => `${t.axisName[x.a]} ${Math.round(x.s * 100)}%`).join(", "), [split, lang]);
   const arriving = wod ? wod.strength : { pre: {}, points: 0 };
 
   /* The calendar defaults to the next time this weekday comes round, since a
@@ -719,24 +756,28 @@ export default function App() {
                   </div>
                 </div>
               )}
-              {/* The barbell work and the accessory work are two blocks of the
-                  session, not one: what happens between the lifts and the
-                  conditioning piece stands on its own. */}
-              {wod.strengthRows?.length > 0 && (
-                <div className="prev">
-                  {[[t.mainLifts, splitRows(wod.strengthRows).lifts],
-                    [t.accessory, splitRows(wod.strengthRows).accessory]]
-                    .filter(([, rows]) => rows.length > 0)
-                    .map(([label, rows]) => (
-                      <div className="prevblock" key={label}>
-                        <p className="lbl" style={{ margin: "0 0 4px" }}>{label}</p>
-                        <ul className="prevlist">
-                          {rows.map((r, i) => <li key={i}>{strengthLine(r, lang, wod.oneRM || {})}</li>)}
-                        </ul>
-                      </div>
+              {/* A session is three blocks and the middle one is not part of
+                  the first, so each one gets a numbered header. The numbers
+                  run over the blocks actually shown: a park day with no
+                  barbell work starts at 01 with its accessories. */}
+              {(() => {
+                const parts = splitRows(wod.strengthRows || []);
+                const pre = [[t.mainLifts, parts.lifts, blocks.lifts],
+                  [t.accessory, parts.accessory, blocks.accessory]]
+                  .filter(([, rows]) => rows.length > 0);
+                return (
+                  <>
+                    {pre.map(([label, rows, load], i) => (
+                      <React.Fragment key={label}>
+                        <BlockHead n={i + 1} name={label} load={load} />
+                        <BlockRows rows={rows} lang={lang} oneRM={wod.oneRM || {}} />
+                      </React.Fragment>
                     ))}
-                </div>
-              )}
+                    <BlockHead n={pre.length + 1} name={t.planner.conditioning}
+                      load={sessionLoad(wod).conditioning} />
+                  </>
+                );
+              })()}
               <div className="card-h">
                 <div className="fmt disp">{headline(wod, lang)}</div>
                 <div className="tag mono">
@@ -746,28 +787,18 @@ export default function App() {
               </div>
 
               <div className="rows">
-                {wod.items.map((it, i) => {
-                  const part = repParts(it, lang, env, wod.fmt);
-                  return (
-                  <div className="row" key={it.move.id}>
-                    {wod.fmt.id === "emom" && <span className="minute mono disp">Min {i + 1}</span>}
-                    <span className={part.dose.length > 8 ? "reps mono long" : "reps mono"}>{part.dose}</span>
-                    <span className="nm">
-                      {part.name}
-                      {part.side && <em> · {part.side}</em>}
-                      {part.kg && <em> · {part.kg}</em>}
-                    </span>
+                {wod.items.map((it, i) => (
+                  <RepLine key={it.move.id} part={repParts(it, lang, env, wod.fmt)}
+                    minute={wod.fmt.id === "emom" ? `Min ${i + 1}` : null}>
                     <button className="ico" title={t.swap} onClick={() => swapOne(it.move.id)}><IconSwap /></button>
                     <button className="ico" title={t.lock} aria-pressed={isLocked(it.move.id)}
                       onClick={() => toggleLock(it.move.id)}>
                       <IconLock on={isLocked(it.move.id)} />
                     </button>
-                  </div>
-                  );
-                })}
+                  </RepLine>
+                ))}
                 {wod.fmt.id === "emom" && wod.items.length === 3 && (
-                  <div className="row"><span className="minute mono disp">Min 4</span>
-                    <span className="reps mono">·</span><span className="nm">{t.rest}</span></div>
+                  <RepLine part={{ dose: "·", name: t.rest }} minute="Min 4" />
                 )}
               </div>
 
@@ -776,26 +807,29 @@ export default function App() {
               <div className="meter">
                 <div className="mhead">
                   <span className="lbl" style={{ margin: 0 }}>{t.load}</span>
-                  <button className="mtoggle disp" onClick={() => setMeterOpen(!meterOpen)}
-                    aria-expanded={meterOpen} aria-controls="plate-meter">
-                    {meterOpen ? t.hideMeter : t.showMeter}
-                  </button>
                   <span className="work mono disp">{dayWork}</span>
                 </div>
-                <div id="plate-meter" hidden={!meterOpen}><Barbell work={dayWork} /></div>
-                <p className="lbl" style={{ marginTop: 14 }}>{t.axes}</p>
-                {AXES.map((a) => {
-                  const s = shares[a] || 0;
-                  const pre = (wod.arriving || wod.strength).pre[a] || 0;
-                  const hot = s > 0.4 || (pre >= 80 && s > 0.24);
-                  return (
-                    <div className="axis" key={a}>
-                      <span className="an">{t.axisName[a]}{pre >= 50 ? " ▪" : ""}</span>
-                      <span className="bar"><i className={hot ? "hot" : ""} style={{ width: `${Math.min(100, s * 220)}%` }} /></span>
-                      <span className="pct mono">{Math.round(s * 100)}%</span>
-                    </div>
-                  );
-                })}
+                <Barbell work={dayWork} />
+                {/* One band, and the caption names its peaks. The percentages
+                    were never a number anyone acted on mid-session; the
+                    warning below is the half that is. */}
+                <div className="split">
+                  <p className="lbl" style={{ margin: 0 }}>{t.axes}</p>
+                  <div className="split-band" role="img" aria-label={splitLabel}>
+                    {split.top.map((x, i) => (
+                      <i key={x.a} className={`s${i + 1}`} style={{ width: `${x.s * 100}%` }} />
+                    ))}
+                  </div>
+                  <p className="split-cap">
+                    {split.top.map((x, i) => (i === 0
+                      ? <strong key={x.a}>{t.axisName[x.a]} {Math.round(x.s * 100)}%</strong>
+                      /* The separator travels with the axis it precedes, so
+                         dropping the third one at 320px leaves no stray dot. */
+                      : <span key={x.a} className={i === 2 ? "split-3" : undefined}>
+                          {" · "}{t.axisName[x.a].toLowerCase()} {Math.round(x.s * 100)}%
+                        </span>))}
+                  </p>
+                </div>
               </div>
 
               {warnList.length > 0 && (

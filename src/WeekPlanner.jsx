@@ -3,9 +3,10 @@ import { AXES, ENVS } from "./moves.js";
 import { INTENSITY, STRENGTH, cueFor } from "./formats.js";
 import { T } from "./i18n.js";
 import { sessionLoad } from "./generator.js";
-import { splitRows } from "./lifts.js";
+import { blockLoads, splitRows } from "./lifts.js";
 import { WEEK_COUNTS, changeEnv, presetsFor, withPreset } from "./planner.js";
-import { asText, headline, repParts, strengthLine } from "./text.js";
+import { asText, headline, repParts } from "./text.js";
+import { BlockHead, BlockRows, RepLine } from "./Blocks.jsx";
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
 
@@ -98,6 +99,13 @@ export default function WeekPlanner({
           const config = configs[index];
           const load = sessionLoad(wod);
           const cue = cueFor(wod, lang);
+          /* Same numbering rule as the Day card: over the blocks actually
+             shown, so a day with no barbell work starts at 01. */
+          const parts = splitRows(wod.strengthRows || []);
+          const blocks = blockLoads(wod.strengthRows || [], oneRM);
+          const pre = [[t.mainLifts, parts.lifts, blocks.lifts],
+            [t.accessory, parts.accessory, blocks.accessory]]
+            .filter(([, rows]) => rows.length > 0);
           return (
             <article className="day-card" key={`${index}-${config.weekday}`}>
               <header className="day-head">
@@ -145,54 +153,37 @@ export default function WeekPlanner({
                 </label>
               </div>
 
-              {[[t.mainLifts, splitRows(wod.strengthRows).lifts],
-                [t.accessory, splitRows(wod.strengthRows).accessory]]
-                .filter(([, rows]) => rows.length > 0)
-                .map(([label, rows]) => (
-                  <div className="day-strength" key={label}>
-                    <p className="grp">{label}</p>
-                    <ul>
-                      {rows.map((row, rowIndex) => <li key={rowIndex}>{strengthLine(row, lang, oneRM)}</li>)}
-                    </ul>
-                  </div>
-                ))}
+              {pre.map(([label, rows, blockLoad], blockIndex) => (
+                <React.Fragment key={label}>
+                  <BlockHead n={blockIndex + 1} name={label} load={blockLoad} />
+                  <BlockRows rows={rows} lang={lang} oneRM={oneRM} />
+                </React.Fragment>
+              ))}
 
               <div className="day-wod">
+                <BlockHead n={pre.length + 1} name={t.planner.conditioning}
+                  load={load.conditioning} />
                 <div className="day-wod-head">
                   <h3 className="disp">{headline(wod, lang)}</h3>
                   <span className="mono">{config.intensity === "auto"
                     ? `${t.planner.auto} → ${t.intensity[wod.plan.intensity]}`
                     : t.intensity[wod.plan.intensity]}</span>
                 </div>
-                <ol>
-                  {wod.items.map((item, itemIndex) => {
-                    const part = repParts(item, lang, wod.plan.env, wod.fmt);
-                    return (
-                    <li key={item.move.id}>
-                      {wod.fmt.id === "emom" && <span className="mono">Min {itemIndex + 1}</span>}
-                      <strong className="mono">{part.dose}</strong>
-                      <span>
-                        {part.name}
-                        {part.side && <em> · {part.side}</em>}
-                        {part.kg && <em> · {part.kg}</em>}
-                      </span>
-                    </li>
-                    );
-                  })}
+                <div className="rows">
+                  {wod.items.map((item, itemIndex) => (
+                    <RepLine key={item.move.id} part={repParts(item, lang, wod.plan.env, wod.fmt)}
+                      minute={wod.fmt.id === "emom" ? `Min ${itemIndex + 1}` : null} />
+                  ))}
                   {wod.fmt.id === "emom" && wod.items.length === 3 && (
-                    <li>
-                      <span className="mono">Min 4</span>
-                      <strong className="mono">·</strong>
-                      <span>{t.rest}</span>
-                    </li>
+                    <RepLine part={{ dose: "·", name: t.rest }} minute="Min 4" />
                   )}
-                </ol>
+                </div>
                 <p className="cue">{cue}</p>
               </div>
 
+              {/* The block headers now carry the conditioning and strength
+                  loads, so the foot keeps only what they do not say. */}
               <footer className="day-foot">
-                <span>{t.planner.conditioning}: <b className="mono">{Math.round(load.conditioning)}</b></span>
-                <span>{t.planner.strength}: <b className="mono">{Math.round(load.strength)}</b></span>
                 {wod.plan.carryPoints > 1 && (
                   <span>{t.planner.carry}: <b className="mono">{Math.round(wod.plan.carryPoints)}</b></span>
                 )}

@@ -25,7 +25,7 @@ The live site is auto-deployed from the default branch. Every other branch gets 
 4. Slots are filled from the movement pool. Every piece opens with a monostructural or full-body movement, then spreads across pushing, pulling, hinging, legs, core, and carries.
 5. Reps come from each movement's typical dose, scaled to the format's volume band and quantised to a sane step (no 37-rep sets of wall balls).
 6. The candidate is scored against a fault list: no axis over its share of the total work, a tighter cap on whatever the strength block already hammered, a ceiling on stacked skill and joint impact, plus soft warnings for grip-heavy and pull-free sessions. The generator draws up to 300 candidates and returns the first clean one, or the least-faulty one it saw.
-7. The result renders with per-movement rep lines, a load breakdown across the six axes, a coaching cue, barbell plate loading for gym sessions, and any warnings that survived.
+7. The result renders as three numbered blocks (barbell work, accessory work, the conditioning piece), each with its own load. Rep lines put the dose first and large, because that is the number you read with the phone on the floor. Under them: barbell plate loading for the day, one band showing how the effort splits across the six axes with its peaks named, a coaching cue, and any warnings that survived.
 
 The app has one model and two views of it. A week is a list of days, and a day carries everything about a session: which weekday, where you train, how hard, the strength block, and anything you locked.
 
@@ -66,6 +66,7 @@ wodmaker/
 │   ├── prefs.js                # the few choices that survive a reload
 │   ├── corpus.js               # reproducible defaults derived from the source log
 │   ├── planner.js              # the week model: days, carry-over, automatic effort
+│   ├── Blocks.jsx              # block headers and rep lines, shared by both views
 │   ├── WeekPlanner.jsx         # the week overview
 │   ├── App.jsx                 # the week state, the day editor, the styles
 │   ├── main.jsx                # React root
