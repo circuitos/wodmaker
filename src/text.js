@@ -42,23 +42,36 @@ export function repLine(it, lang, env, fmt = null) {
   return `${dose} ${name}${side ? ` ${side}` : ""}${kg ? ` (${kg})` : ""}`;
 }
 
-/* One line for one row of the strength block, main lift or accessory, in
+/* One row of the strength block described once, main lift or accessory, in
    the same units the grid itself shows: sets x reps, the weight, and a
-   percentage where one can be computed. Used by the card and by the plain
-   text export, so what you read and what you copy always agree. */
-export function strengthLine(row, lang, oneRM) {
+   percentage where one can be computed.
+ *
+ * Same split as `repParts` and for the same reason. The plain text export
+ * wants one string with the dose in front; the cards want the movement to
+ * lead and the prescription to sit beside it in the mono face. Recovering
+ * either from the other means splitting a rendered string, which is the bug
+ * the week card already had once. `detail` carries its own leading separator
+ * so an empty one joins to nothing. */
+export function strengthParts(row, lang, oneRM = {}) {
   const kgTxt = row.kg > 0 ? ` · ${row.kg} kg` : "";
+  const dose = `${row.sets}×${row.reps}`;
   if (row.liftId) {
     const lift = liftById(row.liftId);
-    if (!lift) return "";
+    if (!lift) return null;
     const pct = pctFor(row, oneRM);
     const pctTxt = pct ? ` · ${Math.round(pct * 100)}%` : "";
-    return `${row.sets}×${row.reps} ${lift[lang]}${kgTxt}${pctTxt}`;
+    return { dose, name: lift[lang], detail: `${kgTxt}${pctTxt}` };
   }
   const move = moveById(row.moveId);
-  if (!move) return "";
-  const side = move.side ? ` ${T[lang].side}` : "";
-  return `${row.sets}×${row.reps} ${move[lang]}${side}${kgTxt}`;
+  if (!move) return null;
+  return { dose, name: move[lang], detail: `${move.side ? ` ${T[lang].side}` : ""}${kgTxt}` };
+}
+
+/* The same row as one string, dose first. Used by the plain text export, so
+   what you read on a card and what you copy always agree. */
+export function strengthLine(row, lang, oneRM) {
+  const part = strengthParts(row, lang, oneRM);
+  return part ? `${part.dose} ${part.name}${part.detail}` : "";
 }
 
 export function headline(c, lang) {

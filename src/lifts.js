@@ -124,6 +124,19 @@ export function splitRows(rows = []) {
   };
 }
 
+/* What each half of the strength block is worth on its own, for anything that
+   shows the blocks separately. The two halves are priced by different
+   functions, so a caller summing rows itself has to know which fork applies
+   and to attach `pct` first; that knowledge belongs here beside the pricing
+   rather than in a renderer. */
+export function blockLoads(rows = [], oneRM = {}) {
+  const { lifts, accessory } = splitRows(rows);
+  return {
+    lifts: lifts.reduce((sum, row) => sum + liftPoints({ ...row, pct: pctFor(row, oneRM) }), 0),
+    accessory: accessory.reduce((sum, row) => sum + accessoryPoints(row), 0),
+  };
+}
+
 /* A fresh accessory row. Movements counted in reps take the usual three sets
    of eight. A distance, calorie or time piece takes one set of the dose the
    movement is normally prescribed at, because "3x8 m" is not a thing and a
